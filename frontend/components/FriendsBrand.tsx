@@ -5,12 +5,13 @@ export function FriendsBrand({ gradient = false }: { gradient?: boolean }) {
     display: "inline-block",
     fontFamily: "'Exo 2', sans-serif",
     fontWeight: 800,
+    fontSize: "1.09em",
     letterSpacing: "-0.03em",
     lineHeight: 1,
     backgroundImage: gradient ? "linear-gradient(100deg, #ff7628 5%, #ff3cac 52%, #a56cff 95%)" : undefined,
     backgroundClip: gradient ? "text" : undefined,
     WebkitBackgroundClip: gradient ? "text" : undefined,
     color: gradient ? "transparent" : undefined,
-    transform: "translateY(0.02em)",
+    transform: "translateY(0.055em)",
   }}>Friends</span>;
 }
