@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@800&family=Permanent+Marker&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent;
+  }
+}
+
+:root {
+  --bg: transparent;
+  --surface: transparent;
+  --surface-2: transparent;
+  --border: rgba(0, 0, 0, 0.12);
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --accent: #ea580c;
+  --accent-2: #5b21b6;
+  --accent-glow: rgba(234, 88, 12, 0.35);
+  --success: #15803d;
+  --danger: #b91c1c;
+}
+
+body {
+  font-family: 'Space Mono', monospace;
+  background: #f8fafc;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.text-glow {
+  text-shadow: 0 0 12px var(--accent-glow), 0 0 24px var(--accent-glow);
+}
+
+.title-highlight {
+  background-color: rgba(234, 88, 12, 0.28);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.friends-page {
+  --border: rgba(192, 132, 252, 0.2);
+  --text: #fffafe;
+  --text-muted: #bcaecf;
+  --accent: #ff3cac;
+  --accent-2: #8b5cf6;
+  --accent-glow: rgba(236, 72, 153, 0.5);
+  --success: #39f58a;
+  --danger: #ff4fa3;
+  position: relative;
+  isolation: isolate;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(124, 58, 237, 0.32), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgba(236, 72, 153, 0.22), transparent 30rem),
+    radial-gradient(circle at 22% 72%, rgba(255, 118, 40, 0.15), transparent 28rem),
+    radial-gradient(circle at 52% 92%, rgba(255, 60, 172, 0.12), transparent 32rem),
+    linear-gradient(180deg, #090313 0%, #10051e 55%, #08020f 100%);
+}
+
+.friends-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, #8b5cf6 1.5px, transparent 1.5px),
+    radial-gradient(circle, #ff3cac 1.5px, transparent 1.5px);
+  background-position: 0 0, 22px 22px;
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black, transparent 75%);
+}
+
+.friends-gradient-text {
+  background: linear-gradient(100deg, #ff7628 5%, #ff3cac 48%, #8257f5 95%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.friends-wordmark {
+  display: inline-block;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 1.03em;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  background: linear-gradient(100deg, #ff7628 5%, #ff3cac 52%, #a56cff 95%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  transform: translateY(0.02em);
+  text-shadow: 0 0 16px rgba(255, 60, 172, 0.24);
+}
+
+.friends-brand {
+  font-family: 'Exo 2', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.friends-hero {
+  border: 1px solid rgba(217, 70, 239, 0.28);
+  background:
+    linear-gradient(125deg, rgba(25, 10, 48, 0.98), rgba(15, 5, 31, 0.96) 48%, rgba(35, 8, 49, 0.96));
+  box-shadow: 0 0 70px rgba(124, 58, 237, 0.22), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.friends-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(2px);
+  pointer-events: none;
+  animation: friendsFloat 7s ease-in-out infinite;
+}
+
+.friends-orb-one { right: -3rem; top: 3rem; width: 10rem; height: 10rem; background: rgba(255, 60, 172, 0.24); filter: blur(18px); }
+.friends-orb-two { left: -4rem; top: 22rem; width: 12rem; height: 12rem; background: rgba(124, 58, 237, 0.25); filter: blur(22px); animation-delay: -3s; }
+
+.friends-card {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.24);
+}
+.friends-card:hover { transform: translateY(-3px); border-color: rgba(217, 70, 239, 0.42); box-shadow: 0 0 38px rgba(139, 92, 246, 0.17); }
+
+.friends-page .input {
+  background: rgba(8, 3, 20, 0.78);
+  color: #fffafe;
+  border-color: rgba(192, 132, 252, 0.28);
+}
+.friends-page .input::placeholder { color: #776a8d; }
+.friends-page .input:focus { border-color: #ff3cac; box-shadow: 0 0 0 1px #ff3cac, 0 0 22px rgba(255, 60, 172, 0.17); }
+
+@keyframes friendsFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-16px) rotate(8deg); }
+}
