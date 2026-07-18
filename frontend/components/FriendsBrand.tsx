@@ -12,7 +12,7 @@ export function FriendsBrand({ gradient = false }: { gradient?: boolean }) {
     backgroundClip: gradient ? "text" : undefined,
     WebkitBackgroundClip: gradient ? "text" : undefined,
     color: gradient ? "transparent" : undefined,
-    transform: "translateY(-0.01em) scaleY(1.16)",
+    transform: "translateY(-0.09em) scaleY(1.16)",
     transformOrigin: "center 55%",
   }}>Friends</span>;
 }
