@@ -8,6 +8,7 @@ import "../private/PrivateVault.sol";
  */
 contract PrivateVaultFactory {
     uint256 public constant MAX_ALLOWED_WALLETS = 100;
+    uint256 public constant MAX_PAGE_SIZE = 100;
 
     struct PrivateVaultParams {
         string claim;
@@ -70,7 +71,7 @@ contract PrivateVaultFactory {
 
         uint256 stakeEndTime = block.timestamp + params.stakePeriod;
         uint256 resolutionDeadline = params.resolutionMode
-                == PrivateVault.ResolutionMode.CREATOR_RESOLVED
+            == PrivateVault.ResolutionMode.CREATOR_RESOLVED
             ? stakeEndTime + params.resolutionPeriod
             : 0;
 
@@ -92,12 +93,48 @@ contract PrivateVaultFactory {
         emit PrivateVaultCreated(vault, msg.sender, params.resolutionMode, stakeEndTime);
     }
 
-    function getAllPrivateVaults() external view returns (address[] memory) {
-        return allPrivateVaults;
+    function privateVaultCount() external view returns (uint256) {
+        return allPrivateVaults.length;
     }
 
-    function getCreatorPrivateVaults(address creator) external view returns (address[] memory) {
-        return _creatorPrivateVaults[creator];
+    function getPrivateVaults(uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory vaults)
+    {
+        require(limit > 0 && limit <= MAX_PAGE_SIZE, "Invalid page size");
+        uint256 count = allPrivateVaults.length;
+        if (offset >= count) return new address[](0);
+
+        uint256 remaining = count - offset;
+        uint256 pageLength = limit < remaining ? limit : remaining;
+        uint256 end = offset + pageLength;
+        vaults = new address[](end - offset);
+        for (uint256 i = offset; i < end; ++i) {
+            vaults[i - offset] = allPrivateVaults[i];
+        }
+    }
+
+    function creatorPrivateVaultCount(address creator) external view returns (uint256) {
+        return _creatorPrivateVaults[creator].length;
+    }
+
+    function getCreatorPrivateVaults(address creator, uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory vaults)
+    {
+        require(limit > 0 && limit <= MAX_PAGE_SIZE, "Invalid page size");
+        address[] storage creatorVaults = _creatorPrivateVaults[creator];
+        uint256 count = creatorVaults.length;
+        if (offset >= count) return new address[](0);
+
+        uint256 remaining = count - offset;
+        uint256 pageLength = limit < remaining ? limit : remaining;
+        vaults = new address[](pageLength);
+        for (uint256 i; i < pageLength; ++i) {
+            vaults[i] = creatorVaults[offset + i];
+        }
     }
 
     function getPrivateVaultMeta(address vault)

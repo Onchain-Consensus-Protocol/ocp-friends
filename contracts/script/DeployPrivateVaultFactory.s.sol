@@ -9,10 +9,11 @@ import "../src/factory/PrivateVaultFactory.sol";
  */
 contract DeployPrivateVaultFactoryScript is Script {
     function run() external returns (PrivateVaultFactory factory) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        require(deployerPrivateKey != 0, "Invalid PRIVATE_KEY");
+        uint256 expectedChainId = vm.envOr("EXPECTED_CHAIN_ID", uint256(84532));
+        require(block.chainid == expectedChainId, "Unexpected deployment chain");
 
-        vm.startBroadcast(deployerPrivateKey);
+        // 由 Foundry 的加密 keystore 账户签名，避免把部署私钥放进仓库或 shell 环境变量。
+        vm.startBroadcast();
         factory = new PrivateVaultFactory();
         vm.stopBroadcast();
 

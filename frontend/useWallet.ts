@@ -1,5 +1,5 @@
 /**
- * 统一钱包 Hook：自动连接、网络检测、切换/添加 Base 主网。
+ * 统一钱包 Hook：自动连接、网络检测、切换/添加当前构建配置的网络。
  * 三个页面（explore、vault、App）共用，行为与其他 dApp 一致。
  */
 import { useCallback, useEffect, useState } from "react";
@@ -15,13 +15,32 @@ const BASE_MAINNET_PARAMS = {
   blockExplorerUrls: ["https://basescan.org"],
 };
 
-/** 本地开发时切换到 Anvil；生产环境继续使用 Base 主网参数。 */
-const TARGET_NETWORK_PARAMS = config.chainId === 31337 ? {
-  chainId: "0x7a69",
-  chainName: "Anvil Local",
+const BASE_SEPOLIA_PARAMS = {
+  chainId: "0x14a34", // 84532
+  chainName: "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: [config.rpcUrl],
-} : BASE_MAINNET_PARAMS;
+  rpcUrls: ["https://sepolia.base.org"],
+  blockExplorerUrls: ["https://sepolia-explorer.base.org"],
+};
+
+/** 根据构建配置选择钱包网络；未知链仍使用配置的 RPC 和十六进制 chain ID。 */
+const TARGET_NETWORK_PARAMS = config.chainId === 31337
+  ? {
+      chainId: "0x7a69",
+      chainName: "Anvil Local",
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: [config.rpcUrl],
+    }
+  : config.chainId === 84532
+    ? BASE_SEPOLIA_PARAMS
+    : config.chainId === 8453
+      ? BASE_MAINNET_PARAMS
+      : {
+          chainId: `0x${config.chainId.toString(16)}`,
+          chainName: `Chain ${config.chainId}`,
+          nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+          rpcUrls: [config.rpcUrl],
+        };
 
 interface Eip1193Provider {
   request: (a: { method: string; params?: unknown[] | object }) => Promise<unknown>;
@@ -41,7 +60,7 @@ export interface WalletState {
   connected: boolean;
   /** 当前钱包所处的链 ID（十进制），未知时为 null */
   chainId: number | null;
-  /** 是否在目标网络（Base 主网） */
+  /** 是否在当前构建配置的目标网络 */
   onTargetNetwork: boolean;
 }
 
@@ -75,10 +94,11 @@ export function useWallet() {
           setConnected(false);
         }
       } else {
-        // 在别的链上：保留 chainId 以便提示，但不建立 signer
+        // 在别的链上：保留已授权地址用于显示切链提示，但绝不建立 signer，避免错链写入。
+        const accounts = (await eth.request({ method: "eth_accounts" })) as string[];
         setSigner(null);
-        setAddress("");
-        setConnected(false);
+        setAddress(accounts[0] ?? "");
+        setConnected(Boolean(accounts[0]));
       }
     } catch {
       setSigner(null);

@@ -168,11 +168,17 @@ contract PrivateVault is ReentrancyGuard {
     }
 
     function canResolve() public view returns (bool) {
-        if (finalized) return true;
-        if (resolutionMode == ResolutionMode.CORE_RULES) {
-            return block.timestamp >= stakeEndTime;
-        }
-        return block.timestamp >= stakeEndTime;
+        return !finalized && block.timestamp >= stakeEndTime;
+    }
+
+    function canResolveByCreator(address account) external view returns (bool) {
+        return account == creator && resolutionMode == ResolutionMode.CREATOR_RESOLVED && !finalized
+            && block.timestamp >= stakeEndTime && block.timestamp <= resolutionDeadline;
+    }
+
+    function canFinalizeExpiredResolution() external view returns (bool) {
+        return !finalized && resolutionMode == ResolutionMode.CREATOR_RESOLVED
+            && block.timestamp > resolutionDeadline;
     }
 
     function addAllowedWallets(address[] calldata wallets) external onlyCreator {
@@ -189,6 +195,7 @@ contract PrivateVault is ReentrancyGuard {
         require(!hasParticipated[wallet], "Wallet already participated");
         require(allowedWallets[wallet], "Wallet not invited");
         allowedWallets[wallet] = false;
+        --allowedWalletCount;
         emit WalletRemoved(wallet);
     }
 
@@ -201,7 +208,14 @@ contract PrivateVault is ReentrancyGuard {
         (Side currentSide, bool hasPosition) = sideOf(msg.sender);
         require(!hasPosition || currentSide == side, "Position is locked to one side");
 
+        // 按实际余额变化验证入账，避免收费币或伪成功代币制造没有资产支持的本金。
+        uint256 balanceBefore = stakeToken.balanceOf(address(this));
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 balanceAfter = stakeToken.balanceOf(address(this));
+        require(
+            balanceAfter >= balanceBefore && balanceAfter - balanceBefore == amount,
+            "Unsupported token transfer"
+        );
         uint256 index = uint256(side);
         if (!hasPosition) {
             hasParticipated[msg.sender] = true;
@@ -248,8 +262,7 @@ contract PrivateVault is ReentrancyGuard {
         require(principal > 0, "No stake");
 
         (Side userSide,) = sideOf(msg.sender);
-        bool eligible =
-            resolvedOutcome == Outcome.INVALID
+        bool eligible = resolvedOutcome == Outcome.INVALID
             || (resolvedOutcome == Outcome.YES && userSide == Side.YES)
             || (resolvedOutcome == Outcome.NO && userSide == Side.NO);
         _claimed[msg.sender] = true;
@@ -258,6 +271,8 @@ contract PrivateVault is ReentrancyGuard {
         if (eligible) {
             require(remainingEligibleClaims > 0, "No eligible claims");
             if (remainingEligibleClaims == 1) {
+                // 产品规则：最后一位有资格领取的人拿走 Vault 当前全部余额。
+                // 因此 finalize 后、最后一次领取执行前直接转入的 USDC 也归该领取者。
                 payout = stakeToken.balanceOf(address(this));
             } else {
                 uint256 denominator = resolvedOutcome == Outcome.INVALID

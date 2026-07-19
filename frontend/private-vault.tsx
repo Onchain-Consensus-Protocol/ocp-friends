@@ -68,6 +68,18 @@ function PrivateVaultPage() {
     finally { setBusy(false); }
   };
 
+  const submitCreatorResolution = () => {
+    if (!state) return;
+    const selectedPool = resolveOutcome === 1 ? state.yes : resolveOutcome === 2 ? state.no : state.total;
+    const emptyWinningSide = state.total > 0n && (resolveOutcome === 1 || resolveOutcome === 2) && selectedPool === 0n;
+    const message = emptyWinningSide
+      ? (zh
+        ? `警告：${outcomeName(resolveOutcome)} 当前无人持仓。确认后将没有任何可领取者，Vault 内全部资金会永久锁死。结果不可更改，仍要继续吗？`
+        : `WARNING: Nobody currently holds ${outcomeName(resolveOutcome)}. Confirming will leave no eligible claimant and permanently lock all funds in this Vault. The result cannot be changed. Continue?`)
+      : (zh ? "该结果不可更改。确认提交吗？" : "This result is final and cannot be changed. Confirm?");
+    if (window.confirm(message)) void transact((vault) => vault.resolveByCreator(resolveOutcome));
+  };
+
   const stake = async (side: number) => {
     if (!state || !wallet.signer) return wallet.connectWallet();
     if (state.mode === 1 && !window.confirm("The creator may have a financial position in this Vault and will determine the final outcome. Continue?")) return;
@@ -88,6 +100,8 @@ function PrivateVaultPage() {
   const canCreatorResolve = Boolean(state && state.mode === 1 && creator && !state.finalized && now >= state.stakeEnd && now <= state.resolutionDeadline);
   const expired = Boolean(state && state.mode === 1 && !state.finalized && now > state.resolutionDeadline);
   const canCoreResolve = Boolean(state && state.mode === 0 && !state.finalized && now >= state.stakeEnd);
+  const selectedPoolIsEmpty = Boolean(state && state.total > 0n && (resolveOutcome === 1 || resolveOutcome === 2) && (resolveOutcome === 1 ? state.yes : state.no) === 0n);
+  const claimEligible = Boolean(state && state.participated && (state.outcome === 3 || (state.outcome === 1 && state.userYes > 0n) || (state.outcome === 2 && state.userNo > 0n)));
   const fmt = (value: bigint) => state ? `${formatUnits(value, state.decimals)} ${state.symbol}` : "—";
   const addresses = manageWallets.split(/[\s,;]+/).map((v) => v.trim()).filter(Boolean);
 
@@ -105,7 +119,7 @@ function PrivateVaultPage() {
           <dl className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-xs font-mono"><Info label="Created by" value={short(state.creator)} /><Info label="Resolution method" value={state.mode === 0 ? "OCP Core Rules" : "Creator Resolved"} /><Info label="Stake deadline" value={formatDate(state.stakeEnd)} /><Info label="Resolution deadline" value={formatDate(state.resolutionDeadline)} /></dl>
           <div className="mt-5 flex flex-wrap items-center gap-4"><button onClick={() => navigator.clipboard.writeText(window.location.href)} className="text-xs text-accent inline-flex items-center gap-1"><Copy className="w-3 h-3" />{zh ? "复制邀请链接" : "Copy invite link"}</button><a href={`/private-vault-rules.html?mode=${state.mode}`} className="text-xs font-bold text-accent hover:underline">{zh ? "查看结算方式 →" : "View settlement method →"}</a></div>
         </section>
-        <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} />
+        <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} zh={zh} />
         <div className="grid lg:grid-cols-3 gap-6">
           <section className="friends-card lg:col-span-2 border border-fuchsia-400/20 bg-[#120921]/90 rounded-2xl p-6"><h2 className="font-display font-bold mb-2">{zh ? "大家目前的选择" : "Current choices"}</h2><p className="mb-5 text-xs text-text-muted">{zh ? "这里只显示每个选项已经投入的总金额。" : "This shows the total amount currently placed on each choice."}</p><div className="grid sm:grid-cols-3 gap-3"><Pool side="YES" amount={fmt(state.yes)} color="text-success" /><Pool side="NO" amount={fmt(state.no)} color="text-danger" /><Pool side="INVALID" amount={fmt(state.invalid)} color="text-fuchsia-300" /></div><div className="mt-4 text-sm font-mono">{zh ? "总参与金额：" : "Total joined: "}<strong>{fmt(state.total)}</strong></div></section>
           <section className="border border-border rounded-2xl p-6"><h2 className="font-display font-bold mb-4">Your Access</h2>{!wallet.connected ? <Button onClick={wallet.connectWallet} variant="outline">Connect wallet</Button> : state.allowed ? <div className="text-success flex gap-2 items-center"><ShieldCheck className="w-5 h-5" /><strong>You are invited.</strong></div> : <div className="text-danger text-sm"><strong>This is a private Vault.</strong><p className="mt-2">Your wallet is not on the participant list.</p></div>}<div className="mt-5 text-xs font-mono text-text-muted">Your position: YES {fmt(state.userYes)} · NO {fmt(state.userNo)} · INVALID {fmt(state.userInvalid)}</div></section>
@@ -114,9 +128,9 @@ function PrivateVaultPage() {
           {state.mode === 1 && staking && <div className="my-4 p-3 border border-[#ff5a6f]/60 bg-[#ff5a6f]/10 rounded-xl text-sm font-bold text-pink-100">The creator may have a financial position in this Vault and will determine the final outcome.</div>}
           {staking && <div className="mt-5"><label className="text-xs font-bold uppercase">Stake amount (minimum {fmt(state.minStake)})</label><input className="input mt-2" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} /><div className="grid sm:grid-cols-3 gap-3 mt-3"><Button disabled={busy || !state.allowed} onClick={() => stake(0)} variant="success">Stake YES</Button><Button disabled={busy || !state.allowed} onClick={() => stake(1)} variant="danger">Stake NO</Button><Button disabled={busy || !state.allowed} onClick={() => stake(2)} variant="secondary">Stake INVALID</Button></div></div>}
           {canCoreResolve && <Button disabled={busy} onClick={() => transact((vault) => vault.finalizeByCoreRules())} variant="primary" className="mt-5">Finalize with OCP Core Rules</Button>}
-          {canCreatorResolve && <div className="mt-5 p-5 border-2 border-amber-500 rounded-xl"><h3 className="font-bold">Submit Final Result</h3><select className="input mt-3" value={resolveOutcome} onChange={(e) => setResolveOutcome(Number(e.target.value))}><option value={1}>YES</option><option value={2}>NO</option><option value={3}>INVALID</option></select><p className="text-sm font-bold text-danger mt-3">This result is final and cannot be changed.</p><Button disabled={busy} onClick={() => window.confirm("This result is final and cannot be changed. Confirm?") && transact((vault) => vault.resolveByCreator(resolveOutcome))} variant="primary" className="mt-3">Confirm Result</Button></div>}
+          {canCreatorResolve && <div className="mt-5 p-5 border-2 border-amber-500 rounded-xl"><h3 className="font-bold">Submit Final Result</h3><select className="input mt-3" value={resolveOutcome} onChange={(e) => setResolveOutcome(Number(e.target.value))}><option value={1}>YES</option><option value={2}>NO</option><option value={3}>INVALID</option></select>{selectedPoolIsEmpty ? <p className="text-sm font-bold text-danger mt-3">{zh ? "警告：该结果当前无人持仓。提交后将没有可领取者，Vault 内全部资金会永久锁死。" : "WARNING: This outcome has no holders. Submitting it will leave no eligible claimant and permanently lock all funds in the Vault."}</p> : <p className="text-sm font-bold text-danger mt-3">{zh ? "该结果不可更改。" : "This result is final and cannot be changed."}</p>}<Button disabled={busy} onClick={submitCreatorResolution} variant="primary" className="mt-3">Confirm Result</Button></div>}
           {expired && <div className="mt-5 p-5 border border-amber-500 rounded-xl"><p>The creator did not submit a result before the deadline. This Vault can now be finalized as INVALID.</p><Button disabled={busy} onClick={() => transact((vault) => vault.finalizeExpiredResolution())} variant="secondary" className="mt-3">Finalize as INVALID</Button></div>}
-          {state.finalized && <div className="mt-5"><p className="font-bold">Final result: {outcomeName(state.outcome)}</p>{state.mode === 1 && <p className="text-sm text-text-muted mt-1">Final result submitted by the creator or finalized INVALID after timeout.</p>}<Button disabled={busy || state.claimed || !state.participated} onClick={() => transact((vault) => vault.withdraw())} variant="primary" className="mt-4">{state.claimed ? "Payout claimed" : "Claim payout"}</Button></div>}
+          {state.finalized && <div className="mt-5"><p className="font-bold">Final result: {outcomeName(state.outcome)}</p>{state.mode === 1 && <p className="text-sm text-text-muted mt-1">Final result submitted by the creator or finalized INVALID after timeout.</p>}{claimEligible ? <Button disabled={busy || state.claimed} onClick={() => transact((vault) => vault.withdraw())} variant="primary" className="mt-4">{state.claimed ? "Payout claimed" : "Claim payout"}</Button> : <p className="mt-4 text-sm font-bold text-text-muted">{state.participated ? (zh ? "你的仓位不是获胜方，没有可领取金额。" : "Your position did not win. There is no payout to claim.") : (zh ? "你没有参与这个 Vault。" : "You did not participate in this Vault.")}</p>}</div>}
         </section>
         {creator && staking && <section className="border border-border rounded-2xl p-6 mt-6"><h2 className="font-display font-bold">Manage Allowed Wallets</h2><textarea className="input min-h-24 mt-3 font-mono" value={manageWallets} onChange={(e) => setManageWallets(e.target.value)} placeholder="Paste wallet addresses" /><div className="flex gap-3 mt-3"><Button disabled={busy || !addresses.length || addresses.some((v) => !isAddress(v))} onClick={() => transact((vault) => vault.addAllowedWallets(addresses)).then(() => setManageWallets(""))} variant="outline">Add wallets</Button><Button disabled={busy || addresses.length !== 1 || !isAddress(addresses[0] ?? "")} onClick={() => transact((vault) => vault.removeAllowedWallet(addresses[0])).then(() => setManageWallets(""))} variant="danger">Remove wallet</Button></div><p className="text-xs text-text-muted mt-3">A wallet can be removed only before the deadline and before it participates. The creator can never be removed.</p></section>}
       </>}
@@ -136,7 +150,7 @@ function AccessGate({ access, error, zh, onConnect }: { access: "connect" | "che
 }
 
 function Info({ label, value }: { label: string; value: string }) { return <div><dt className="text-text-muted mb-1">{label}</dt><dd className="font-bold break-words">{value}</dd></div>; }
-function ResolutionMethod({ mode, stakeEnd, resolutionDeadline }: { mode: number; stakeEnd: number; resolutionDeadline: number }) {
+function ResolutionMethod({ mode, stakeEnd, resolutionDeadline, zh }: { mode: number; stakeEnd: number; resolutionDeadline: number; zh: boolean }) {
   return <section className={`mb-6 rounded-2xl border-2 p-6 ${mode === 0 ? "border-accent/60 bg-accent/10" : "border-fuchsia-400/60 bg-fuchsia-400/10"}`}>
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="text-xl font-display font-bold">Resolution Method / 结算方式</h2>
@@ -156,6 +170,7 @@ function ResolutionMethod({ mode, stakeEnd, resolutionDeadline }: { mode: number
       <p><strong>Finality / 最终性：</strong>The submitted result is final and cannot be changed or revoked.</p>
       <div className="grid gap-1 pt-1 font-mono text-xs sm:grid-cols-2"><span>Staking ends / 质押截止：{formatDate(stakeEnd)}</span><span>Resolution deadline / 结算截止：{formatDate(resolutionDeadline)}</span></div>
     </div>}
+    <p className="mt-4 rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100">{zh ? "最后一名有资格领取的人拿走 Vault 当时的全部剩余余额，包括结算后、最后领取前直接转入的 USDC。最后领取完成后再转入的资金会锁死。" : "The final eligible claimant receives the Vault's entire remaining balance, including USDC transferred after finalization but before that final claim. Transfers arriving afterward remain locked."}</p>
   </section>;
 }
 function Pool({ side, amount, color }: { side: string; amount: string; color: string }) { return <div className="p-4 border border-border rounded-xl"><div className={`font-bold ${color}`}>{side}</div><div className="font-mono mt-2 text-sm">{amount}</div></div>; }

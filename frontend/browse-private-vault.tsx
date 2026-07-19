@@ -21,6 +21,7 @@ type MyVault = {
 };
 
 const STAGE_ORDER: Record<VaultStage, number> = { claimable: 0, settlement: 1, active: 2, invited: 3, ended: 4 };
+const VAULT_PAGE_SIZE = 100;
 
 function BrowsePrivateVault() {
   const wallet = useWallet();
@@ -41,24 +42,32 @@ function BrowsePrivateVault() {
     try {
       const provider = new JsonRpcProvider(config.rpcUrl);
       const factory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
-      const allAddresses = await factory.getAllPrivateVaults() as string[];
+      const count = Number(await factory.privateVaultCount());
+      const allAddresses: string[] = [];
+      for (let offset = 0; offset < count; offset += VAULT_PAGE_SIZE) {
+        const page = await factory.getPrivateVaults(offset, VAULT_PAGE_SIZE) as string[];
+        allAddresses.push(...page);
+      }
       const now = Math.floor(Date.now() / 1000);
       const results = await Promise.all(allAddresses.map(async (vaultAddress): Promise<MyVault | null> => {
         try {
           const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
           if (!await vault.allowedWallets(wallet.address)) return null;
-          const [participated, finalized, claimed, stakeEndRaw, modeRaw, outcomeRaw, meta] = await Promise.all([
+          const [participated, finalized, claimed, stakeEndRaw, modeRaw, outcomeRaw, stake, meta] = await Promise.all([
             vault.hasParticipated(wallet.address), vault.finalized(), vault.hasClaimed(wallet.address),
-            vault.stakeEndTime(), vault.resolutionMode(), vault.resolvedOutcome(), factory.getPrivateVaultMeta(vaultAddress),
+            vault.stakeEndTime(), vault.resolutionMode(), vault.resolvedOutcome(), vault.stakeOf(wallet.address),
+            factory.getPrivateVaultMeta(vaultAddress),
           ]);
           const stakeEnd = Number(stakeEndRaw);
+          const outcome = Number(outcomeRaw);
+          const eligible = outcome === 3 || (outcome === 1 && stake[0] > 0n) || (outcome === 2 && stake[1] > 0n);
           let stage: VaultStage;
-          if (finalized && participated && !claimed) stage = "claimable";
+          if (finalized && participated && !claimed && eligible) stage = "claimable";
           else if (finalized) stage = "ended";
           else if (now >= stakeEnd) stage = "settlement";
           else if (participated) stage = "active";
           else stage = "invited";
-          return { address: vaultAddress, claim: String(meta[0]) || "Private Vault", mode: Number(modeRaw), outcome: Number(outcomeRaw), stakeEnd, stage };
+          return { address: vaultAddress, claim: String(meta[0]) || "Private Vault", mode: Number(modeRaw), outcome, stakeEnd, stage };
         } catch { return null; }
       }));
       setMyVaults(results.filter((item): item is MyVault => item !== null).sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] || b.stakeEnd - a.stakeEnd));

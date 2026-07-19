@@ -13,6 +13,23 @@ contract TestUSDC is ERC20 {
     }
 }
 
+contract FeeOnTransferToken is ERC20 {
+    constructor() ERC20("Fee Token", "FEE") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _update(address from, address to, uint256 amount) internal override {
+        if (from != address(0) && to != address(0)) {
+            super._update(from, address(0), 1);
+            super._update(from, to, amount - 1);
+        } else {
+            super._update(from, to, amount);
+        }
+    }
+}
+
 contract PrivateVaultTest is Test {
     PrivateVaultFactory private factory;
     TestUSDC private token;
@@ -128,6 +145,172 @@ contract PrivateVaultTest is Test {
         assertEq(uint256(expiredVault.resolvedOutcome()), uint256(PrivateVault.Outcome.INVALID));
     }
 
+    function testCreatorMaySelectEmptyWinningSideAndLockPool() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, vault, PrivateVault.Side.NO, 15 * UNIT);
+
+        vm.warp(vault.stakeEndTime());
+        vm.prank(creator);
+        vault.resolveByCreator(PrivateVault.Outcome.YES);
+
+        assertEq(uint256(vault.resolvedOutcome()), uint256(PrivateVault.Outcome.YES));
+        assertEq(vault.remainingEligibleClaims(), 0);
+        assertEq(vault.settlementPool(), 15 * UNIT);
+
+        uint256 beforeAlice = token.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw();
+        assertEq(token.balanceOf(alice), beforeAlice);
+        assertEq(token.balanceOf(address(vault)), 15 * UNIT);
+    }
+
+    function testRejectsFeeOnTransferStakeWithoutChangingAccounting() public {
+        FeeOnTransferToken feeToken = new FeeOnTransferToken();
+        feeToken.mint(alice, 100 * UNIT);
+        address[] memory invited = new address[](1);
+        invited[0] = alice;
+        PrivateVault vault =
+            _createWithToken(address(feeToken), PrivateVault.ResolutionMode.CORE_RULES, 0, invited);
+
+        vm.prank(alice);
+        feeToken.approve(address(vault), type(uint256).max);
+        vm.prank(alice);
+        vm.expectRevert("Unsupported token transfer");
+        vault.stake(PrivateVault.Side.YES, 10 * UNIT);
+
+        assertEq(vault.totalPrincipal(), 0);
+        assertEq(vault.totalStakeYes(), 0);
+        assertFalse(vault.hasParticipated(alice));
+        assertEq(feeToken.balanceOf(address(vault)), 0);
+    }
+
+    function testLastClaimantReceivesTransfersAfterFinalization() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, vault, PrivateVault.Side.YES, 1 * UNIT);
+        _stake(bob, vault, PrivateVault.Side.YES, 2 * UNIT);
+        _stake(creator, vault, PrivateVault.Side.NO, 7 * UNIT);
+
+        vm.warp(vault.stakeEndTime());
+        vm.prank(creator);
+        vault.resolveByCreator(PrivateVault.Outcome.YES);
+        assertEq(vault.settlementPool(), 10 * UNIT);
+
+        vm.prank(creator);
+        vault.withdraw();
+        assertEq(vault.remainingEligibleClaims(), 2);
+
+        uint256 aliceBefore = token.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw();
+        assertEq(token.balanceOf(alice) - aliceBefore, 10 * UNIT / 3);
+
+        vm.prank(outsider);
+        token.transfer(address(vault), 5 * UNIT);
+
+        uint256 bobBefore = token.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw();
+        assertEq(token.balanceOf(bob) - bobBefore, 15 * UNIT - (10 * UNIT / 3));
+        assertEq(token.balanceOf(address(vault)), 0);
+
+        vm.prank(outsider);
+        token.transfer(address(vault), UNIT);
+        assertEq(token.balanceOf(address(vault)), UNIT);
+    }
+
+    function testFinalizationTransferFollowsLastClaimOrder() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, vault, PrivateVault.Side.YES, 1 * UNIT);
+        _stake(bob, vault, PrivateVault.Side.YES, 2 * UNIT);
+        _stake(creator, vault, PrivateVault.Side.NO, 7 * UNIT);
+
+        vm.warp(vault.stakeEndTime());
+        vm.prank(creator);
+        vault.resolveByCreator(PrivateVault.Outcome.YES);
+
+        uint256 bobBefore = token.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw();
+        assertEq(token.balanceOf(bob) - bobBefore, 20 * UNIT / 3);
+
+        vm.prank(outsider);
+        token.transfer(address(vault), 5 * UNIT);
+
+        uint256 aliceBefore = token.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw();
+        assertEq(token.balanceOf(alice) - aliceBefore, 15 * UNIT - (20 * UNIT / 3));
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
+
+    function testRemovingAllowedWalletReleasesCapacity() public {
+        address[] memory invited = new address[](99);
+        for (uint256 i; i < invited.length; ++i) {
+            invited[i] = address(uint160(10_000 + i));
+        }
+        PrivateVault vault =
+            _createWithToken(address(token), PrivateVault.ResolutionMode.CORE_RULES, 0, invited);
+        assertEq(vault.allowedWalletCount(), 100);
+
+        vm.prank(creator);
+        vault.removeAllowedWallet(invited[0]);
+        assertEq(vault.allowedWalletCount(), 99);
+
+        address replacement = address(uint160(20_000));
+        address[] memory addition = new address[](1);
+        addition[0] = replacement;
+        vm.prank(creator);
+        vault.addAllowedWallets(addition);
+        assertTrue(vault.allowedWallets(replacement));
+        assertEq(vault.allowedWalletCount(), 100);
+    }
+
+    function testCanResolveViewsFollowAvailableSettlementPath() public {
+        PrivateVault coreVault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        assertFalse(coreVault.canResolve());
+        vm.warp(coreVault.stakeEndTime());
+        assertTrue(coreVault.canResolve());
+        coreVault.finalizeByCoreRules();
+        assertFalse(coreVault.canResolve());
+
+        PrivateVault creatorVault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        vm.warp(creatorVault.stakeEndTime());
+        assertTrue(creatorVault.canResolve());
+        assertTrue(creatorVault.canResolveByCreator(creator));
+        assertFalse(creatorVault.canResolveByCreator(alice));
+        vm.warp(creatorVault.resolutionDeadline() + 1);
+        assertTrue(creatorVault.canResolve());
+        assertFalse(creatorVault.canResolveByCreator(creator));
+        assertTrue(creatorVault.canFinalizeExpiredResolution());
+        creatorVault.finalizeExpiredResolution();
+        assertFalse(creatorVault.canResolve());
+        assertFalse(creatorVault.canFinalizeExpiredResolution());
+    }
+
+    function testFactoryPagination() public {
+        PrivateVault first = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault second = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault third = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+
+        assertEq(factory.privateVaultCount(), 3);
+        address[] memory page = factory.getPrivateVaults(1, 2);
+        assertEq(page.length, 2);
+        assertEq(page[0], address(second));
+        assertEq(page[1], address(third));
+        assertEq(factory.getPrivateVaults(3, 2).length, 0);
+
+        assertEq(factory.creatorPrivateVaultCount(creator), 3);
+        address[] memory creatorPage = factory.getCreatorPrivateVaults(creator, 0, 2);
+        assertEq(creatorPage.length, 2);
+        assertEq(creatorPage[0], address(first));
+        assertEq(creatorPage[1], address(second));
+
+        vm.expectRevert("Invalid page size");
+        factory.getPrivateVaults(0, 0);
+        vm.expectRevert("Invalid page size");
+        factory.getPrivateVaults(0, 101);
+    }
+
     function testNoDonationEntryPoint() public {
         PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
         (bool ok,) = address(vault).call(abi.encodeWithSignature("donate(uint256)", UNIT));
@@ -141,16 +324,26 @@ contract PrivateVaultTest is Test {
         address[] memory invited = new address[](2);
         invited[0] = alice;
         invited[1] = bob;
-        PrivateVaultFactory.PrivateVaultParams memory params = PrivateVaultFactory.PrivateVaultParams({
-            claim: "Will the team ship?",
-            description: "A private claim party",
-            stakeToken: address(token),
-            resolutionMode: mode,
-            stakePeriod: 1 days,
-            resolutionPeriod: resolutionPeriod,
-            minStake: UNIT,
-            allowedWallets: invited
-        });
+        vault = _createWithToken(address(token), mode, resolutionPeriod, invited);
+    }
+
+    function _createWithToken(
+        address tokenAddress,
+        PrivateVault.ResolutionMode mode,
+        uint256 resolutionPeriod,
+        address[] memory invited
+    ) private returns (PrivateVault vault) {
+        PrivateVaultFactory.PrivateVaultParams memory params =
+            PrivateVaultFactory.PrivateVaultParams({
+                claim: "Will the team ship?",
+                description: "A private claim party",
+                stakeToken: tokenAddress,
+                resolutionMode: mode,
+                stakePeriod: 1 days,
+                resolutionPeriod: resolutionPeriod,
+                minStake: UNIT,
+                allowedWallets: invited
+            });
         vm.prank(creator);
         vault = PrivateVault(factory.createPrivateVault(params));
     }
@@ -160,12 +353,9 @@ contract PrivateVaultTest is Test {
         token.approve(address(vault), type(uint256).max);
     }
 
-    function _stake(
-        address user,
-        PrivateVault vault,
-        PrivateVault.Side side,
-        uint256 amount
-    ) private {
+    function _stake(address user, PrivateVault vault, PrivateVault.Side side, uint256 amount)
+        private
+    {
         _approve(user, vault);
         vm.prank(user);
         vault.stake(side, amount);

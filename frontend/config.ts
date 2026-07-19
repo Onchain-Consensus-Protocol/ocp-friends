@@ -26,8 +26,11 @@ export const PRIVATE_VAULT_ABI = [
 export const PRIVATE_VAULT_FACTORY_ABI = [
   "function createPrivateVault((string claim,string description,address stakeToken,uint8 resolutionMode,uint256 stakePeriod,uint256 resolutionPeriod,uint256 minStake,address[] allowedWallets) params) returns (address vault)",
   "function getPrivateVaultMeta(address vault) view returns (string claim, string description)",
-  "function getCreatorPrivateVaults(address creator) view returns (address[])",
-  "function getAllPrivateVaults() view returns (address[])", "function isPrivateVault(address vault) view returns (bool)",
+  "function creatorPrivateVaultCount(address creator) view returns (uint256)",
+  "function getCreatorPrivateVaults(address creator,uint256 offset,uint256 limit) view returns (address[])",
+  "function privateVaultCount() view returns (uint256)",
+  "function getPrivateVaults(uint256 offset,uint256 limit) view returns (address[])",
+  "function isPrivateVault(address vault) view returns (bool)",
   "function MAX_ALLOWED_WALLETS() view returns (uint256)",
   "event PrivateVaultCreated(address indexed vault,address indexed creator,uint8 resolutionMode,uint256 stakeEndTime)",
 ] as const;

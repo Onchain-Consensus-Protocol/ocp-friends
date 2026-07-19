@@ -5,7 +5,8 @@ OCP/Friends is an independent, invite-only Vault product built on the OCP settle
 - **OCP Core Rules:** a strict majority of staked principal determines YES or NO; otherwise the result is INVALID.
 - **Creator Resolved:** the creator submits YES, NO, or INVALID after staking ends. If the creator misses the deadline, anyone can finalize INVALID.
 
-An empty Vault always settles as INVALID. INVALID returns each participant's full principal. Private Vault has no donation mechanism.
+An empty Vault always settles as INVALID. INVALID returns each participant's full principal. There is no `donate()` entry point, but anyone can transfer USDC directly to a Vault. Extra USDC received after finalization and before the final eligible withdrawal goes to that final claimant; transfers received afterward remain locked.
+In Creator Resolved mode, submitting YES or NO when nobody holds that side in a funded Vault is permitted and permanently locks the settlement pool because there is no eligible claimant. The frontend displays a warning before submission.
 
 ## Repository
 
@@ -41,14 +42,21 @@ The production frontend must use a deployed `PrivateVaultFactory` and a stake to
 
 ```bash
 cd contracts
-export PRIVATE_KEY=0x...
-forge script script/DeployPrivateVaultFactory.s.sol:DeployPrivateVaultFactoryScript \
-  --rpc-url "$RPC_URL" \
-  --broadcast \
-  --verify
+cast wallet import deployer --interactive
+make deploy
 ```
 
-Never commit private keys or deployment secrets.
+The deployment target defaults to Base Sepolia (`84532`) and verifies the Factory through the Base Sepolia Blockscout API. The script rejects an unexpected chain ID. Never commit private keys or deployment secrets.
+
+For the Base Sepolia frontend build, use the newly deployed Factory address with:
+
+```dotenv
+VITE_PRIVATE_VAULT_FACTORY_ADDRESS=0x...
+VITE_DEPOSIT_TOKEN_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+VITE_CHAIN_ID=84532
+VITE_RPC_URL=https://sepolia.base.org
+VITE_EXPLORER=https://sepolia-explorer.base.org
+```
 
 ## Privacy boundary
 

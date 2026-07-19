@@ -32,6 +32,7 @@ export const WalletButton: React.FC<Props> = ({
   const t = (zh: string, en: string) => (lang === "zh" ? zh : en);
   const shortAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
   const networkLabel = chainId ? (NETWORK_LABELS[chainId] ?? `Chain ${chainId}`) : "";
+  const targetNetworkLabel = NETWORK_LABELS[targetChainId] ?? `Chain ${targetChainId}`;
 
   if (connected && onTargetNetwork) {
     return (
@@ -61,7 +62,7 @@ export const WalletButton: React.FC<Props> = ({
         </span>
         <Button size="sm" onClick={onConnect} variant="primary" className="!border-warning/60 !text-warning">
           <Zap className="w-3.5 h-3.5 mr-1" />
-          {t("切换到 Base", "Switch to Base")}
+          {t(`切换到 ${targetNetworkLabel}`, `Switch to ${targetNetworkLabel}`)}
         </Button>
       </div>
     );
