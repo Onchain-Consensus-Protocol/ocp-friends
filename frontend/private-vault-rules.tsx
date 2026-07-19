@@ -31,7 +31,6 @@ const COPY = {
     yesOnly: "YES participants get paid", yesZero: "They share the available funds according to how much each person put in. NO and INVALID participants get nothing.",
     noOnly: "NO participants get paid", noZero: "They share the available funds according to how much each person put in. YES and INVALID participants get nothing.",
     everyone: "Full refund", everyoneDetail: "Every participant gets back the full amount they put in. If nobody participated, there is nothing to claim.",
-    lastClaim: "Claim-order rule: the final eligible claimant receives the Vault's entire remaining balance, including USDC transferred after finalization but before that final claim. Transfers arriving later remain locked.",
   },
   zh: {
     create: "创建私人金库", eyebrow: "只属于你和朋友们", title: "玩法",
@@ -46,7 +45,6 @@ const COPY = {
     yesOnly: "选择 YES 的人可以拿钱", yesZero: "按照每个人投入的多少来分。选择 NO 或 INVALID 的人拿不到钱。",
     noOnly: "选择 NO 的人可以拿钱", noZero: "按照每个人投入的多少来分。选择 YES 或 INVALID 的人拿不到钱。",
     everyone: "全额退还", everyoneDetail: "每位参与者取回自己投入的全部本金。没有人参与时，不需要领取任何资金。",
-    lastClaim: "领取顺序规则：最后一名有资格领取的人拿走 Vault 当时的全部剩余余额，包括结算后、最后领取前直接转入的 USDC；最后领取完成后再转入的资金仍会锁死。",
   },
 } as const;
 
@@ -60,7 +58,7 @@ function RulesPage() {
       <div className="friends-orb friends-orb-one" /><div className="friends-orb friends-orb-two" />
       <div className="friends-hero relative mb-8 overflow-hidden rounded-[2rem] p-7 sm:p-10"><Sparkles className="absolute right-7 top-7 h-10 w-10 text-fuchsia-400/80" /><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-4 py-2 text-xs font-bold text-fuchsia-200 shadow-[0_0_18px_rgba(217,70,239,0.2)]"><PartyPopper className="h-4 w-4" />{t.eyebrow}</div><h1 className="max-w-3xl text-4xl font-display font-bold sm:text-6xl">{t.title}</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-text-muted sm:text-base">{t.intro}</p></div>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2"><ModeButton active={mode === 0} onClick={() => setMode(0)} title="OCP Core Rules" subtitle={t.coreSub} /><ModeButton active={mode === 1} onClick={() => setMode(1)} title="Creator Resolved" subtitle={t.creatorSub} warning /></div>
+      <div className="mb-8 grid gap-3 sm:grid-cols-2"><ModeButton active={mode === 0} onClick={() => setMode(0)} title="OCP Core Rules" subtitle={t.coreSub} /><ModeButton active={mode === 1} onClick={() => setMode(1)} title={lang === "zh" ? "创建者结算" : "Creator Resolved"} subtitle={t.creatorSub} warning /></div>
 
       <section className={`friends-card rounded-2xl border-2 p-6 sm:p-8 ${mode === 0 ? "border-accent/60 bg-[#120921]/90" : "border-fuchsia-400/70 bg-[#160a29]/95"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="text-xs font-bold uppercase tracking-widest text-text-muted">{t.step1}</div><h2 className="mt-2 text-2xl font-display font-bold">{mode === 0 ? t.coreTitle : t.creatorTitle}</h2></div><span className={`self-start rounded-full px-3 py-1 text-xs font-bold ${mode === 0 ? "bg-accent/10 text-accent" : "bg-fuchsia-200 text-fuchsia-900"}`}>{mode === 0 ? t.automatic : t.trusted}</span></div>
@@ -69,7 +67,7 @@ function RulesPage() {
       </section>
 
       <FlowArrow label={t.fixed} />
-      <section className="friends-card rounded-2xl border border-fuchsia-400/20 bg-[#120921]/90 p-6 sm:p-8"><div className="text-xs font-bold uppercase tracking-widest text-text-muted">{t.step2}</div><h2 className="mt-2 text-2xl font-display font-bold">{t.receives}</h2><div className="mt-6 grid gap-4 md:grid-cols-3"><Eligibility outcome="YES" eligible={t.yesOnly} detail={t.yesZero} color="border-success/50 bg-success/10 text-success" outcomeLabel={t.outcome} /><Eligibility outcome="NO" eligible={t.noOnly} detail={t.noZero} color="border-danger/50 bg-danger/10 text-danger" outcomeLabel={t.outcome} /><Eligibility outcome="INVALID" eligible={t.everyone} detail={t.everyoneDetail} color="border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-300" outcomeLabel={t.outcome} /></div><p className="mt-5 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs leading-5 text-amber-100">{t.lastClaim}</p></section>
+      <section className="friends-card rounded-2xl border border-fuchsia-400/20 bg-[#120921]/90 p-6 sm:p-8"><div className="text-xs font-bold uppercase tracking-widest text-text-muted">{t.step2}</div><h2 className="mt-2 text-2xl font-display font-bold">{t.receives}</h2><div className="mt-6 grid gap-4 md:grid-cols-3"><Eligibility outcome="YES" eligible={t.yesOnly} detail={t.yesZero} color="border-success/50 bg-success/10 text-success" outcomeLabel={t.outcome} /><Eligibility outcome="NO" eligible={t.noOnly} detail={t.noZero} color="border-danger/50 bg-danger/10 text-danger" outcomeLabel={t.outcome} /><Eligibility outcome="INVALID" eligible={t.everyone} detail={t.everyoneDetail} color="border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-300" outcomeLabel={t.outcome} /></div></section>
     </main>
   </div>;
 }

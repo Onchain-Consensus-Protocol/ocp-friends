@@ -9,6 +9,7 @@ import { Button } from "./components/Button";
 import { config, PRIVATE_VAULT_ABI, PRIVATE_VAULT_FACTORY_ABI } from "./config";
 import { useWallet } from "./useWallet";
 import type { Language } from "./types";
+import { friendlyError } from "./friendly-error";
 
 type VaultStage = "invited" | "active" | "settlement" | "claimable" | "ended";
 type MyVault = {
@@ -73,9 +74,9 @@ function BrowsePrivateVault() {
       setMyVaults(results.filter((item): item is MyVault => item !== null).sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] || b.stakeEnd - a.stakeEnd));
     } catch (reason) {
       setMyVaults([]);
-      setVaultsError(reason instanceof Error ? reason.message : String(reason));
+      setVaultsError(friendlyError(reason, zh));
     } finally { setLoadingVaults(false); }
-  }, [wallet.address]);
+  }, [wallet.address, zh]);
 
   useEffect(() => { void loadMyVaults(); }, [loadMyVaults]);
 
@@ -127,8 +128,8 @@ function VaultCard({ vault, zh }: { key?: React.Key; vault: MyVault; zh: boolean
   return <a href={`/private-vault.html?vault=${vault.address}`} className="friends-card group rounded-2xl border border-fuchsia-400/20 bg-[#0d0618]/80 p-5 hover:border-fuchsia-400/50">
     <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${stageStyle[vault.stage]}`}>{stageLabel[vault.stage]}</span><ArrowRight className="h-4 w-4 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-fuchsia-300" /></div>
     <h3 className="mt-4 line-clamp-2 font-display text-lg font-bold">{vault.claim}</h3>
-    <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-text-muted"><span className="rounded-md border border-border px-2 py-1">{vault.mode === 0 ? "OCP Core Rules" : "Creator Resolved"}</span>{vault.outcome > 0 && <span className="rounded-md border border-border px-2 py-1">{zh ? "结果" : "Result"}: {outcome}</span>}</div>
-    <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">{vault.stage === "claimable" ? <Gift className="h-4 w-4 text-success" /> : <Clock3 className="h-4 w-4" />}<span>{vault.stage === "ended" || vault.stage === "claimable" ? (zh ? "点击查看详情" : "Open details") : `${zh ? "参与截止" : "Stake ends"}: ${new Date(vault.stakeEnd * 1000).toLocaleString()}`}</span></div>
+    <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-text-muted"><span className="rounded-md border border-border px-2 py-1">{vault.mode === 0 ? "OCP Core Rules" : (zh ? "创建者结算" : "Creator Resolved")}</span>{vault.outcome > 0 && <span className="rounded-md border border-border px-2 py-1">{zh ? "结果" : "Result"}: {outcome}</span>}</div>
+    <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">{vault.stage === "claimable" ? <Gift className="h-4 w-4 text-success" /> : <Clock3 className="h-4 w-4" />}<span>{vault.stage === "ended" || vault.stage === "claimable" ? (zh ? "点击查看详情" : "Open details") : `${zh ? "参与截止" : "Stake ends"}: ${new Date(vault.stakeEnd * 1000).toLocaleString(zh ? "zh-CN" : "en-US")}`}</span></div>
     <div className="mt-3 truncate font-mono text-[10px] text-text-muted">{vault.address}</div>
   </a>;
 }
