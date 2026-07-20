@@ -2,11 +2,11 @@
 
 OCP/Friends is an independent, invite-only Vault product built on the OCP settlement model. A creator opens a Vault, invites up to 100 wallets, and chooses one of two resolution methods:
 
-- **OCP Core Rules:** a strict majority of staked principal determines YES or NO; otherwise the result is INVALID.
+- **AUTOMATIC_MAJORITY:** players stake only YES or NO. A side above 50% wins; a tie or no participation resolves INVALID and refunds participants.
 - **Creator Resolved:** the creator submits YES, NO, or INVALID after staking ends. If the creator misses the deadline, anyone can finalize INVALID.
 
 An empty Vault always settles as INVALID. INVALID returns each participant's full principal. There is no `donate()` entry point, but anyone can transfer USDC directly to a Vault. Extra USDC received after finalization and before the final eligible withdrawal goes to that final claimant; transfers received afterward remain locked.
-In Creator Resolved mode, submitting YES or NO when nobody holds that side in a funded Vault is permitted and permanently locks the settlement pool because there is no eligible claimant. The frontend displays a warning before submission.
+In Creator Resolved mode, the contract rejects YES or NO when nobody holds that side. The creator must select a side with holders or INVALID. After a missed deadline, any address can trigger INVALID settlement.
 
 ## Repository
 

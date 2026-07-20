@@ -24,7 +24,6 @@ function CreatePrivateVault() {
   const [claim, setClaim] = useState("");
   const [yesMeaning, setYesMeaning] = useState("");
   const [noMeaning, setNoMeaning] = useState("");
-  const [invalidMeaning, setInvalidMeaning] = useState("");
   const [mode, setMode] = useState<0 | 1>(0);
   const [stakeHours, setStakeHours] = useState("24");
   const [resolutionHours, setResolutionHours] = useState("24");
@@ -49,7 +48,7 @@ function CreatePrivateVault() {
 
   const create = async () => {
     if (!claim.trim()) return setError(zh ? "请填写主题。" : "Enter a claim.");
-    const meanings = { yes: yesMeaning, no: noMeaning, invalid: invalidMeaning };
+    const meanings = { yes: yesMeaning, no: noMeaning };
     const meaningsError = validateOutcomeMeanings(meanings, zh);
     if (meaningsError) return setError(meaningsError);
     if (!wallet.signer) return wallet.connectWallet();
@@ -90,13 +89,13 @@ function CreatePrivateVault() {
       {error && <div className="mb-5 p-4 border border-danger bg-danger/5 rounded-xl text-sm text-danger break-words"><AlertTriangle className="inline w-4 h-4 mr-2" />{error}</div>}
       <div className="friends-card space-y-6 rounded-3xl border border-fuchsia-400/20 bg-[#120921]/90 p-6 shadow-xl backdrop-blur sm:p-8">
         <Field label={zh ? "主题" : "Claim"}><input required aria-label={zh ? "主题" : "Claim"} value={claim} onChange={(e) => setClaim(e.target.value)} className="input" placeholder={zh ? "Alex 喜欢 Jessica 吗？" : "Does Alex like Jessica?"} /></Field>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label={zh ? "YES 的含义（必填）" : "YES meaning (required)"}><textarea required aria-label={zh ? "YES 的含义" : "YES meaning"} value={yesMeaning} onChange={(e) => setYesMeaning(e.target.value)} className="input min-h-24" placeholder={zh ? "例如：喜欢" : "For example: Alex likes Jessica"} /></Field>
           <Field label={zh ? "NO 的含义（必填）" : "NO meaning (required)"}><textarea required aria-label={zh ? "NO 的含义" : "NO meaning"} value={noMeaning} onChange={(e) => setNoMeaning(e.target.value)} className="input min-h-24" placeholder={zh ? "例如：不喜欢" : "For example: Alex does not like Jessica"} /></Field>
-          <Field label={zh ? "INVALID 的含义（必填）" : "INVALID meaning (required)"}><textarea required aria-label={zh ? "INVALID 的含义" : "INVALID meaning"} value={invalidMeaning} onChange={(e) => setInvalidMeaning(e.target.value)} className="input min-h-24" placeholder={zh ? "例如：无法确定" : "For example: Cannot be determined"} /></Field>
         </div>
+        <div className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-400/10 p-4 text-sm text-fuchsia-100">{zh ? "玩家只能选择 YES 或 NO。INVALID 是平局、取消、无法判断或超时时的全额退款结果，不能提前质押。" : "Players can stake only YES or NO. INVALID is a full-refund result for a tie, cancellation, uncertainty, or timeout; it cannot be staked."}</div>
         <Field label={zh ? "结算方式" : "Resolution Method"}><div className="grid sm:grid-cols-2 gap-3">
-          <Mode selected={mode === 0} onClick={() => setMode(0)} title="OCP Core Rules" text={zh ? "按照 OCP 原始资金多数规则自动判断结果。" : "Uses the original OCP Vault capital-majority resolution mechanism."} />
+          <Mode selected={mode === 0} onClick={() => setMode(0)} title="AUTOMATIC_MAJORITY" text={zh ? "YES 或 NO 严格超过 50% 时获胜；平局或无人参与时 INVALID 并退款。" : "YES or NO wins above 50%; a tie or no participation resolves INVALID with refunds."} />
           <Mode selected={mode === 1} onClick={() => setMode(1)} title={zh ? "创建者结算" : "Creator Resolved"} text={zh ? "参与结束后，由创建者提交 YES、NO 或 INVALID。" : "The creator submits YES, NO, or INVALID after staking ends."} />
         </div></Field>
         {mode === 1 && <div className="p-4 rounded-xl border-2 border-fuchsia-400/60 bg-fuchsia-400/10 text-fuchsia-100 text-sm"><strong>{zh ? "信任提示：" : "Trust notice:"}</strong>{zh ? "创建者也可以参与，并且只有创建者能提交最终结果。请只参加你信任的朋友创建的金库。" : " The creator may stake and has sole authority to submit the final result. Only participate if you trust the creator."}</div>}

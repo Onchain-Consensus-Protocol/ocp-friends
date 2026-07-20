@@ -25,11 +25,11 @@ const COPY = {
     coreTitle: "Strict capital majority", creatorTitle: "Creator submits YES / NO / INVALID", automatic: "AUTOMATIC RULE", trusted: "TRUSTED CREATOR",
     yesWins: "YES wins", yesRule: "YES principal > 50% of all principal", noWins: "NO wins", noRule: "NO principal > 50% of all principal",
     invalid: "INVALID", invalidRule: "Neither YES nor NO has a strict majority, or nobody participates", during: "During staking", duringText: "The creator stakes together with the other invited wallets",
-    window: "Resolution window", windowText: "Creator submits YES, NO, or INVALID; in a funded Vault, choosing an empty YES/NO side permanently locks all funds", missed: "Deadline missed", missedText: "Anyone finalizes the Vault as INVALID",
+    window: "Resolution window", windowText: "Creator submits YES, NO, or INVALID; an empty YES or NO side cannot be selected", missed: "Deadline missed", missedText: "Anyone can trigger INVALID settlement and refunds",
     trustLabel: "Trust warning:", trustText: "The creator may hold a financial position and also controls the final result. The result is permanent once submitted.",
     fixed: "Result confirmed", step2: "Step 2 · Who gets paid", receives: "What happens after settlement?", outcome: "Result",
-    yesOnly: "YES participants get paid", yesZero: "They share the available funds according to how much each person put in. NO and INVALID participants get nothing.",
-    noOnly: "NO participants get paid", noZero: "They share the available funds according to how much each person put in. YES and INVALID participants get nothing.",
+    yesOnly: "YES participants get paid", yesZero: "They share the available funds according to how much each person put in. NO participants get nothing.",
+    noOnly: "NO participants get paid", noZero: "They share the available funds according to how much each person put in. YES participants get nothing.",
     everyone: "Full refund", everyoneDetail: "Every participant gets back the full amount they put in. If nobody participated, there is nothing to claim.",
   },
   zh: {
@@ -39,11 +39,11 @@ const COPY = {
     coreTitle: "资金严格多数规则", creatorTitle: "创建者提交 YES / NO / INVALID", automatic: "自动规则", trusted: "信任创建者",
     yesWins: "YES 获胜", yesRule: "YES 本金严格超过全部本金的 50%", noWins: "NO 获胜", noRule: "NO 本金严格超过全部本金的 50%",
     invalid: "INVALID", invalidRule: "YES 和 NO 均未取得严格多数，或没有任何人参与", during: "质押期间", duringText: "创建者和其他受邀钱包一起参与质押",
-    window: "结算窗口", windowText: "只有创建者可以提交结果；有资金时若选择无人持仓的 YES/NO，全部资金将永久锁死", missed: "创建者超时", missedText: "任何地址都可以将金库结算为 INVALID",
+    window: "结算窗口", windowText: "只有创建者可以提交结果；无人持仓的 YES 或 NO 不能被选择", missed: "创建者超时", missedText: "任何地址都可以触发 INVALID 结算并退款",
     trustLabel: "信任提示：", trustText: "创建者可以持有仓位，同时控制最终结果。结果一经提交即永久生效，不能更改。",
     fixed: "结果已经确定", step2: "第二步 · 谁可以拿钱", receives: "结算后怎么处理？", outcome: "结算结果",
-    yesOnly: "选择 YES 的人可以拿钱", yesZero: "按照每个人投入的多少来分。选择 NO 或 INVALID 的人拿不到钱。",
-    noOnly: "选择 NO 的人可以拿钱", noZero: "按照每个人投入的多少来分。选择 YES 或 INVALID 的人拿不到钱。",
+    yesOnly: "选择 YES 的人可以拿钱", yesZero: "按照每个人投入的多少来分。选择 NO 的人拿不到钱。",
+    noOnly: "选择 NO 的人可以拿钱", noZero: "按照每个人投入的多少来分。选择 YES 的人拿不到钱。",
     everyone: "全额退还", everyoneDetail: "每位参与者取回自己投入的全部本金。没有人参与时，不需要领取任何资金。",
   },
 } as const;
@@ -58,7 +58,7 @@ function RulesPage() {
       <div className="friends-orb friends-orb-one" /><div className="friends-orb friends-orb-two" />
       <div className="friends-hero relative mb-8 overflow-hidden rounded-[2rem] p-7 sm:p-10"><Sparkles className="absolute right-7 top-7 h-10 w-10 text-fuchsia-400/80" /><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-4 py-2 text-xs font-bold text-fuchsia-200 shadow-[0_0_18px_rgba(217,70,239,0.2)]"><PartyPopper className="h-4 w-4" />{t.eyebrow}</div><h1 className="max-w-3xl text-4xl font-display font-bold sm:text-6xl">{t.title}</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-text-muted sm:text-base">{t.intro}</p></div>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2"><ModeButton active={mode === 0} onClick={() => setMode(0)} title="OCP Core Rules" subtitle={t.coreSub} /><ModeButton active={mode === 1} onClick={() => setMode(1)} title={lang === "zh" ? "创建者结算" : "Creator Resolved"} subtitle={t.creatorSub} warning /></div>
+      <div className="mb-8 grid gap-3 sm:grid-cols-2"><ModeButton active={mode === 0} onClick={() => setMode(0)} title="AUTOMATIC_MAJORITY" subtitle={t.coreSub} /><ModeButton active={mode === 1} onClick={() => setMode(1)} title={lang === "zh" ? "创建者结算" : "Creator Resolved"} subtitle={t.creatorSub} warning /></div>
 
       <section className={`friends-card rounded-2xl border-2 p-6 sm:p-8 ${mode === 0 ? "border-accent/60 bg-[#120921]/90" : "border-fuchsia-400/70 bg-[#160a29]/95"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="text-xs font-bold uppercase tracking-widest text-text-muted">{t.step1}</div><h2 className="mt-2 text-2xl font-display font-bold">{mode === 0 ? t.coreTitle : t.creatorTitle}</h2></div><span className={`self-start rounded-full px-3 py-1 text-xs font-bold ${mode === 0 ? "bg-accent/10 text-accent" : "bg-fuchsia-200 text-fuchsia-900"}`}>{mode === 0 ? t.automatic : t.trusted}</span></div>

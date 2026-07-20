@@ -22,6 +22,8 @@ export function friendlyError(reason: unknown, zh: boolean): string {
   if (match("wallet not invited") || match("not allowed")) return zh ? "当前钱包不在这个 Vault 的邀请名单中。" : "This wallet is not on the Vault invite list.";
   if (match("staking ended")) return zh ? "参与时间已经结束。" : "The staking period has ended.";
   if (match("amount below min stake")) return zh ? "输入金额低于最低参与金额。" : "The amount is below the minimum stake.";
+  if (match("no yes stake")) return zh ? "YES 当前无人持仓，不能结算为 YES。请选择有持仓的一方或 INVALID。" : "YES has no holders. Choose a side with holders or INVALID.";
+  if (match("no no stake")) return zh ? "NO 当前无人持仓，不能结算为 NO。请选择有持仓的一方或 INVALID。" : "NO has no holders. Choose a side with holders or INVALID.";
   if (match("too many decimals") || match("underflow") || match("invalid decimal") || match("invalid fixednumber")) return zh ? "请输入有效金额；USDC 最多支持 6 位小数。" : "Enter a valid amount. USDC supports up to 6 decimal places.";
   if (match("already finalized") || match("already resolved")) return zh ? "这个 Vault 已经完成结算。" : "This Vault has already been finalized.";
   if (match("already claimed")) return zh ? "你已经领取过资金。" : "You have already claimed your payout.";

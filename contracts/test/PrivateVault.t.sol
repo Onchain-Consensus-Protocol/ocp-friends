@@ -51,7 +51,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testFactoryStoresMetadataAndWhitelist() public {
-        PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         (string memory claim, string memory description) =
             factory.getPrivateVaultMeta(address(vault));
 
@@ -64,7 +64,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testOutsiderCannotStake() public {
-        PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         _approve(outsider, vault);
         vm.prank(outsider);
         vm.expectRevert("Wallet not invited");
@@ -72,7 +72,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testCoreRulesPaysWinningSideProRata() public {
-        PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         _stake(creator, vault, PrivateVault.Side.YES, 60 * UNIT);
         _stake(alice, vault, PrivateVault.Side.YES, 20 * UNIT);
         _stake(bob, vault, PrivateVault.Side.NO, 20 * UNIT);
@@ -97,8 +97,31 @@ contract PrivateVaultTest is Test {
         assertEq(token.balanceOf(bob), beforeBob);
     }
 
+    function testAutomaticMajorityExactBoundaries() public {
+        PrivateVault yesVault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        _stake(alice, yesVault, PrivateVault.Side.YES, 51 * UNIT);
+        _stake(bob, yesVault, PrivateVault.Side.NO, 49 * UNIT);
+        vm.warp(yesVault.stakeEndTime());
+        yesVault.finalizeByCoreRules();
+        assertEq(uint256(yesVault.resolvedOutcome()), uint256(PrivateVault.Outcome.YES));
+
+        PrivateVault noVault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        _stake(alice, noVault, PrivateVault.Side.YES, 49 * UNIT);
+        _stake(bob, noVault, PrivateVault.Side.NO, 51 * UNIT);
+        vm.warp(noVault.stakeEndTime());
+        noVault.finalizeByCoreRules();
+        assertEq(uint256(noVault.resolvedOutcome()), uint256(PrivateVault.Outcome.NO));
+
+        PrivateVault tieVault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        _stake(alice, tieVault, PrivateVault.Side.YES, 50 * UNIT);
+        _stake(bob, tieVault, PrivateVault.Side.NO, 50 * UNIT);
+        vm.warp(tieVault.stakeEndTime());
+        tieVault.finalizeByCoreRules();
+        assertEq(uint256(tieVault.resolvedOutcome()), uint256(PrivateVault.Outcome.INVALID));
+    }
+
     function testInvalidRefundsEveryoneInFull() public {
-        PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         _stake(alice, vault, PrivateVault.Side.YES, 40 * UNIT);
         _stake(bob, vault, PrivateVault.Side.NO, 40 * UNIT);
 
@@ -118,7 +141,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testEmptyVaultAlwaysFinalizesInvalid() public {
-        PrivateVault coreVault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault coreVault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         vm.warp(coreVault.stakeEndTime());
         coreVault.finalizeByCoreRules();
         assertEq(uint256(coreVault.resolvedOutcome()), uint256(PrivateVault.Outcome.INVALID));
@@ -126,7 +149,10 @@ contract PrivateVaultTest is Test {
         PrivateVault creatorVault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
         vm.warp(creatorVault.stakeEndTime());
         vm.prank(creator);
+        vm.expectRevert("No YES stake");
         creatorVault.resolveByCreator(PrivateVault.Outcome.YES);
+        vm.prank(creator);
+        creatorVault.resolveByCreator(PrivateVault.Outcome.INVALID);
         assertEq(uint256(creatorVault.resolvedOutcome()), uint256(PrivateVault.Outcome.INVALID));
     }
 
@@ -145,23 +171,81 @@ contract PrivateVaultTest is Test {
         assertEq(uint256(expiredVault.resolvedOutcome()), uint256(PrivateVault.Outcome.INVALID));
     }
 
-    function testCreatorMaySelectEmptyWinningSideAndLockPool() public {
+    function testCreatorCannotSelectEmptyWinningSide() public {
         PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
         _stake(alice, vault, PrivateVault.Side.NO, 15 * UNIT);
 
         vm.warp(vault.stakeEndTime());
         vm.prank(creator);
+        vm.expectRevert("No YES stake");
         vault.resolveByCreator(PrivateVault.Outcome.YES);
 
-        assertEq(uint256(vault.resolvedOutcome()), uint256(PrivateVault.Outcome.YES));
-        assertEq(vault.remainingEligibleClaims(), 0);
-        assertEq(vault.settlementPool(), 15 * UNIT);
+        PrivateVault yesOnlyVault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, yesOnlyVault, PrivateVault.Side.YES, 15 * UNIT);
+        vm.warp(yesOnlyVault.stakeEndTime());
+        vm.prank(creator);
+        vm.expectRevert("No NO stake");
+        yesOnlyVault.resolveByCreator(PrivateVault.Outcome.NO);
 
-        uint256 beforeAlice = token.balanceOf(alice);
+        assertFalse(vault.finalized());
+        vm.prank(creator);
+        vault.resolveByCreator(PrivateVault.Outcome.NO);
+        assertEq(uint256(vault.resolvedOutcome()), uint256(PrivateVault.Outcome.NO));
+    }
+
+    function testCreatorInvalidRefundsYesAndNo() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, vault, PrivateVault.Side.YES, 9 * UNIT);
+        _stake(bob, vault, PrivateVault.Side.NO, 11 * UNIT);
+
+        vm.warp(vault.stakeEndTime());
+        vm.prank(creator);
+        vault.resolveByCreator(PrivateVault.Outcome.INVALID);
+
+        uint256 aliceBefore = token.balanceOf(alice);
         vm.prank(alice);
         vault.withdraw();
-        assertEq(token.balanceOf(alice), beforeAlice);
-        assertEq(token.balanceOf(address(vault)), 15 * UNIT);
+        assertEq(token.balanceOf(alice) - aliceBefore, 9 * UNIT);
+
+        uint256 bobBefore = token.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw();
+        assertEq(token.balanceOf(bob) - bobBefore, 11 * UNIT);
+    }
+
+    function testInvalidIsNotAStakeableSide() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        _approve(alice, vault);
+        vm.prank(alice);
+        (bool ok,) = address(vault)
+            .call(abi.encodeWithSignature("stake(uint8,uint256)", uint8(2), 10 * UNIT));
+        assertFalse(ok);
+        assertEq(vault.totalPrincipal(), 0);
+        assertEq(vault.totalStakeInvalid(), 0);
+        (uint256 yes, uint256 no, uint256 invalidAmount) = vault.stakeOf(alice);
+        assertEq(yes, 0);
+        assertEq(no, 0);
+        assertEq(invalidAmount, 0);
+        assertEq(vault.protocolVersion(), 2);
+        assertEq(vault.totalPrincipal(), vault.totalStakeYes() + vault.totalStakeNo());
+    }
+
+    function testExpiredCreatorResolutionRefundsPrincipal() public {
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.CREATOR_RESOLVED, 1 days);
+        _stake(alice, vault, PrivateVault.Side.YES, 6 * UNIT);
+        _stake(bob, vault, PrivateVault.Side.NO, 4 * UNIT);
+        vm.warp(vault.resolutionDeadline() + 1);
+        vault.finalizeExpiredResolution();
+
+        uint256 aliceBefore = token.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw();
+        assertEq(token.balanceOf(alice) - aliceBefore, 6 * UNIT);
+
+        uint256 bobBefore = token.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw();
+        assertEq(token.balanceOf(bob) - bobBefore, 4 * UNIT);
     }
 
     function testRejectsFeeOnTransferStakeWithoutChangingAccounting() public {
@@ -169,8 +253,9 @@ contract PrivateVaultTest is Test {
         feeToken.mint(alice, 100 * UNIT);
         address[] memory invited = new address[](1);
         invited[0] = alice;
-        PrivateVault vault =
-            _createWithToken(address(feeToken), PrivateVault.ResolutionMode.CORE_RULES, 0, invited);
+        PrivateVault vault = _createWithToken(
+            address(feeToken), PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0, invited
+        );
 
         vm.prank(alice);
         feeToken.approve(address(vault), type(uint256).max);
@@ -248,8 +333,9 @@ contract PrivateVaultTest is Test {
         for (uint256 i; i < invited.length; ++i) {
             invited[i] = address(uint160(10_000 + i));
         }
-        PrivateVault vault =
-            _createWithToken(address(token), PrivateVault.ResolutionMode.CORE_RULES, 0, invited);
+        PrivateVault vault = _createWithToken(
+            address(token), PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0, invited
+        );
         assertEq(vault.allowedWalletCount(), 100);
 
         vm.prank(creator);
@@ -266,7 +352,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testCanResolveViewsFollowAvailableSettlementPath() public {
-        PrivateVault coreVault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault coreVault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         assertFalse(coreVault.canResolve());
         vm.warp(coreVault.stakeEndTime());
         assertTrue(coreVault.canResolve());
@@ -288,9 +374,9 @@ contract PrivateVaultTest is Test {
     }
 
     function testFactoryPagination() public {
-        PrivateVault first = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
-        PrivateVault second = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
-        PrivateVault third = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault first = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        PrivateVault second = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        PrivateVault third = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
 
         assertEq(factory.privateVaultCount(), 3);
         address[] memory page = factory.getPrivateVaults(1, 2);
@@ -312,7 +398,7 @@ contract PrivateVaultTest is Test {
     }
 
     function testNoDonationEntryPoint() public {
-        PrivateVault vault = _create(PrivateVault.ResolutionMode.CORE_RULES, 0);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
         (bool ok,) = address(vault).call(abi.encodeWithSignature("donate(uint256)", UNIT));
         assertFalse(ok);
     }

@@ -19,8 +19,7 @@ contract PrivateVault is ReentrancyGuard {
 
     enum Side {
         YES,
-        NO,
-        INVALID
+        NO
     }
     enum Outcome {
         PENDING,
@@ -29,7 +28,7 @@ contract PrivateVault is ReentrancyGuard {
         INVALID
     }
     enum ResolutionMode {
-        CORE_RULES,
+        AUTOMATIC_MAJORITY,
         CREATOR_RESOLVED
     }
 
@@ -44,7 +43,6 @@ contract PrivateVault is ReentrancyGuard {
     struct StakeInfo {
         uint256 yes;
         uint256 no;
-        uint256 invalid;
     }
 
     mapping(address => bool) public allowedWallets;
@@ -52,8 +50,8 @@ contract PrivateVault is ReentrancyGuard {
     uint256 public allowedWalletCount;
     mapping(address => StakeInfo) private _stakeOf;
     mapping(address => bool) private _claimed;
-    uint256[3] private _totalStakeBySide;
-    uint256[3] private _participantCountBySide;
+    uint256[2] private _totalStakeBySide;
+    uint256[2] private _participantCountBySide;
     uint256 private _totalPrincipal;
     uint256 private _totalParticipants;
 
@@ -119,7 +117,7 @@ contract PrivateVault is ReentrancyGuard {
     }
 
     function protocolVersion() external pure returns (uint256) {
-        return 1;
+        return 2;
     }
 
     function resolutionTime() external view returns (uint256) {
@@ -146,20 +144,21 @@ contract PrivateVault is ReentrancyGuard {
         return _totalStakeBySide[1];
     }
 
-    function totalStakeInvalid() external view returns (uint256) {
-        return _totalStakeBySide[2];
+    function totalStakeInvalid() external pure returns (uint256) {
+        // ABI 兼容旧前端；v2 中 INVALID 是退款结果，不是可质押仓位。
+        return 0;
     }
 
     function stakeOf(address user) external view returns (uint256, uint256, uint256) {
         StakeInfo storage info = _stakeOf[user];
-        return (info.yes, info.no, info.invalid);
+        // 第三个返回值保留用于兼容旧前端，v2 中恒为零。
+        return (info.yes, info.no, 0);
     }
 
     function sideOf(address user) public view returns (Side side, bool hasPosition) {
         StakeInfo storage info = _stakeOf[user];
         if (info.yes > 0) return (Side.YES, true);
         if (info.no > 0) return (Side.NO, true);
-        if (info.invalid > 0) return (Side.INVALID, true);
         return (Side.YES, false);
     }
 
@@ -230,7 +229,7 @@ contract PrivateVault is ReentrancyGuard {
     }
 
     function finalizeByCoreRules() external nonReentrant {
-        require(resolutionMode == ResolutionMode.CORE_RULES, "Wrong resolution mode");
+        require(resolutionMode == ResolutionMode.AUTOMATIC_MAJORITY, "Wrong resolution mode");
         require(!finalized, "Already finalized");
         require(block.timestamp >= stakeEndTime, "Staking not ended");
         _finalize(_deriveOutcome());
@@ -242,6 +241,9 @@ contract PrivateVault is ReentrancyGuard {
         require(block.timestamp >= stakeEndTime, "Stake period active");
         require(block.timestamp <= resolutionDeadline, "Resolution period expired");
         require(outcome_ != Outcome.PENDING, "Invalid outcome");
+        // INVALID 是退款结算状态；YES/NO 必须确实存在可领取的持仓，避免资金被锁死。
+        if (outcome_ == Outcome.YES) require(_totalStakeBySide[0] > 0, "No YES stake");
+        if (outcome_ == Outcome.NO) require(_totalStakeBySide[1] > 0, "No NO stake");
         _finalize(outcome_);
         emit CreatorResolved(creator, resolvedOutcome, block.timestamp);
     }
@@ -296,13 +298,16 @@ contract PrivateVault is ReentrancyGuard {
 
     function _finalize(Outcome outcome_) private {
         if (_totalPrincipal == 0) outcome_ = Outcome.INVALID;
+        // 防御性不变量：未来新增结算入口时也不能把结果指向无人持仓的一侧。
+        if (outcome_ == Outcome.YES) require(_totalStakeBySide[0] > 0, "No YES stake");
+        if (outcome_ == Outcome.NO) require(_totalStakeBySide[1] > 0, "No NO stake");
         resolvedOutcome = outcome_;
         finalized = true;
         settlementPool = stakeToken.balanceOf(address(this));
         remainingEligibleClaims = outcome_ == Outcome.INVALID
             ? _totalParticipants
             : _participantCountBySide[outcome_ == Outcome.YES ? 0 : 1];
-        emit Finalized(outcome_, _totalStakeBySide[0], _totalStakeBySide[1], _totalStakeBySide[2]);
+        emit Finalized(outcome_, _totalStakeBySide[0], _totalStakeBySide[1], 0);
     }
 
     function _deriveOutcome() private view returns (Outcome) {
@@ -314,10 +319,9 @@ contract PrivateVault is ReentrancyGuard {
     function _setSideAmount(StakeInfo storage info, Side side, uint256 amount) private {
         info.yes = side == Side.YES ? amount : 0;
         info.no = side == Side.NO ? amount : 0;
-        info.invalid = side == Side.INVALID ? amount : 0;
     }
 
     function _userPrincipal(StakeInfo storage info) private view returns (uint256) {
-        return info.yes + info.no + info.invalid;
+        return info.yes + info.no;
     }
 }
