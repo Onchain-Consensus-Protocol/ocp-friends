@@ -34,10 +34,10 @@ export function FriendsHeader({ lang, onToggleLang, current, wallet, onNavigate 
   };
   return <>
     <nav className="sticky top-0 z-50 border-b border-fuchsia-400/20 bg-[#090313]/90 shadow-[0_8px_30px_rgba(124,58,237,0.12)] backdrop-blur-xl">
-      <div className="mx-auto flex min-h-16 max-w-7xl items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 md:py-0 lg:px-8">
-        <a href="/private-vault-rules.html" onClick={(event) => navigate(event, "/private-vault-rules.html")} className="group flex min-w-0 shrink items-center gap-2 sm:gap-3" aria-label="OCP Friends">
-          <img src="/logo.png" alt="OCP" className="h-8 w-8 shrink-0 rounded-md object-contain transition-transform group-hover:rotate-6 group-hover:scale-110" />
-          <span className="whitespace-nowrap font-display text-[15px] font-bold tracking-wide text-text sm:text-xl">OCP<span className="friends-gradient-text">/</span><FriendsBrand gradient /></span>
+      <div className="mx-auto grid min-h-16 w-full max-w-7xl grid-cols-[minmax(0,1fr)_2.25rem_auto] items-center gap-2 px-2 py-2 sm:px-6 md:flex md:gap-3 md:py-0 lg:px-8">
+        <a href="/private-vault-rules.html" onClick={(event) => navigate(event, "/private-vault-rules.html")} className="group flex min-w-0 items-center gap-1.5 overflow-hidden sm:gap-3 md:shrink-0" aria-label="OCP Friends">
+          <img src="/logo.png" alt="OCP" className="h-7 w-7 shrink-0 rounded-md object-contain transition-transform group-hover:rotate-6 group-hover:scale-110 sm:h-8 sm:w-8" />
+          <span className="truncate whitespace-nowrap font-display text-[13px] font-bold tracking-wide text-text sm:text-xl">OCP<span className="friends-gradient-text">/</span><FriendsBrand gradient /></span>
         </a>
         <div className="ml-auto hidden items-center gap-2 md:flex">{LINKS.map((link) => {
           const active = current === link.id || (current === "vault" && link.id === "browse");

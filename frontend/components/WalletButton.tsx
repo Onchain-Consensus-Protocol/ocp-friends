@@ -31,21 +31,23 @@ export const WalletButton: React.FC<Props> = ({
 }) => {
   const t = (zh: string, en: string) => (lang === "zh" ? zh : en);
   const shortAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
+  const mobileShortAddr = address ? `${address.slice(0, 4)}…${address.slice(-4)}` : "";
   const networkLabel = chainId ? (NETWORK_LABELS[chainId] ?? `Chain ${chainId}`) : "";
   const targetNetworkLabel = NETWORK_LABELS[targetChainId] ?? `Chain ${targetChainId}`;
 
   if (connected && onTargetNetwork) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
         <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-success border border-success/40 bg-success/10 rounded-md px-2 py-1">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           {networkLabel}
         </span>
-        <div className="flex items-center gap-2 bg-transparent border border-border rounded-lg px-3 py-1.5">
-          <span className="text-xs font-bold text-text font-mono max-w-[140px] truncate" title={address}>
-            {shortAddr}
+        <div className="flex min-w-0 items-center gap-1 rounded-lg border border-border bg-transparent px-2 py-1.5 sm:gap-2 sm:px-3">
+          <span className="max-w-[88px] truncate font-mono text-[11px] font-bold text-text sm:max-w-[140px] sm:text-xs" title={address}>
+            <span className="sm:hidden">{mobileShortAddr}</span>
+            <span className="hidden sm:inline">{shortAddr}</span>
           </span>
-          <button onClick={onDisconnect} className="text-text-muted hover:text-danger transition-colors p-1" title={t("断开", "Disconnect")}>
+          <button onClick={onDisconnect} className="shrink-0 p-0.5 text-text-muted transition-colors hover:text-danger sm:p-1" title={t("断开", "Disconnect")}>
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -55,8 +57,8 @@ export const WalletButton: React.FC<Props> = ({
 
   if (connected && !onTargetNetwork) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-warning border border-warning/40 bg-warning/10 rounded-md px-2 py-1">
+      <div className="flex items-center gap-1 sm:gap-2">
+        <span className="hidden items-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 font-mono text-[10px] font-bold text-warning sm:inline-flex">
           <AlertTriangle className="w-3 h-3" />
           {networkLabel}
         </span>
