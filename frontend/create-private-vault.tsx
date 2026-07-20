@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Contract, isAddress, parseUnits } from "ethers";
-import { PartyPopper, Plus, Sparkles, Trash2, AlertTriangle } from "lucide-react";
+import { PartyPopper, Plus, Sparkles, Trash2 } from "lucide-react";
 import { FriendsBrand } from "./components/FriendsBrand";
 import { Button } from "./components/Button";
 import { config, PRIVATE_VAULT_FACTORY_ABI } from "./config";
 import type { Language } from "./types";
 import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
+import { ErrorDialog } from "./components/ErrorDialog";
 import { encodeOutcomeMeanings, validateOutcomeMeanings } from "./outcome-metadata";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -79,7 +80,7 @@ export function CreatePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
   return <main className="relative mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="friends-orb friends-orb-one" /><div className="friends-orb friends-orb-two" />
       <div className="friends-hero relative mb-8 overflow-hidden rounded-[2rem] p-7 sm:p-10"><Sparkles className="absolute right-7 top-7 h-10 w-10 text-fuchsia-400/80" /><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-4 py-2 text-xs font-bold text-fuchsia-200"><PartyPopper className="h-4 w-4" />{zh ? "提出主张，派对开始。" : "Make a claim. Let the party begin."}</div><h1 className="text-4xl font-display font-bold sm:text-5xl">{zh ? <>创建 <FriendsBrand gradient /> Market</> : <>Create a <FriendsBrand gradient /> Market</>}</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-text-muted">{zh ? "独立、仅限邀请。创建者会自动加入名单，你只需要邀请想一起玩的朋友。" : "Independent and invite-only. The creator is added automatically—just invite the friends you want to play with."}</p></div>
-      {error && <div className="mb-5 p-4 border border-danger bg-danger/5 rounded-xl text-sm text-danger break-words"><AlertTriangle className="inline w-4 h-4 mr-2" />{error}</div>}
+      {error && <ErrorDialog message={error} lang={lang} onClose={() => setError("")} />}
       <div className="friends-card space-y-6 rounded-3xl border border-fuchsia-400/20 bg-[#120921]/90 p-6 shadow-xl backdrop-blur sm:p-8">
         <Field label={zh ? "主题" : "Claim"}><input required aria-label={zh ? "主题" : "Claim"} value={claim} onChange={(e) => setClaim(e.target.value)} className="input" placeholder={zh ? "Alex 喜欢 Jessica 吗？" : "Does Alex like Jessica?"} /></Field>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -7,6 +7,7 @@ import { config, PRIVATE_VAULT_ABI, PRIVATE_VAULT_FACTORY_ABI } from "./config";
 import type { Language } from "./types";
 import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
+import { ErrorDialog } from "./components/ErrorDialog";
 
 type VaultStage = "invited" | "active" | "settlement" | "claimable" | "ended";
 type MyVault = {
@@ -87,6 +88,7 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
       </section>
 
       <section className="friends-card relative z-10 mt-8 min-w-0 overflow-hidden rounded-3xl border border-fuchsia-400/25 bg-[#120921]/95 p-6 shadow-[0_0_55px_rgba(139,92,246,0.22)] backdrop-blur sm:p-8">
+        {vaultsError && <ErrorDialog message={vaultsError} lang={lang} onClose={() => setVaultsError("")} />}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3"><div className="rounded-2xl bg-gradient-to-br from-[#ff7628] via-[#ff3cac] to-[#8257f5] p-3 text-white"><UsersRound className="h-6 w-6" /></div><div><h2 className="font-display text-xl font-bold">{zh ? "我的市场" : "My Markets"}</h2><p className="mt-1 text-xs text-text-muted">{zh ? "只显示当前钱包有权限进入的市场" : "Only Markets available to the connected wallet"}</p></div></div>
           {wallet.connected && <Button onClick={() => void loadMyVaults()} disabled={loadingVaults} variant="outline" size="sm"><RefreshCw className={`h-3.5 w-3.5 ${loadingVaults ? "animate-spin" : ""}`} />{zh ? "刷新" : "Refresh"}</Button>}
@@ -94,7 +96,6 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
 
         {!wallet.connected ? <div className="mt-7 rounded-2xl border border-fuchsia-400/20 bg-white/5 p-7 text-center"><KeyRound className="mx-auto h-8 w-8 text-fuchsia-300" /><p className="mt-3 text-sm text-text-muted">{zh ? "连接钱包后自动加载你的市场。" : "Connect your wallet to load your Markets."}</p><Button onClick={wallet.connectWallet} variant="primary" className="mt-5 !rounded-xl !bg-gradient-to-r !from-[#ff7628] !via-[#ff3cac] !to-[#8257f5]">{zh ? "连接钱包" : "Connect wallet"}</Button></div>
         : loadingVaults ? <div className="mt-8 text-center text-sm text-text-muted">{zh ? "正在链上查找你的市场…" : "Finding your Markets onchain…"}</div>
-        : vaultsError ? <div role="alert" className="mt-6 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{vaultsError}</div>
         : myVaults.length === 0 ? <div className="mt-7 rounded-2xl border border-dashed border-fuchsia-400/25 p-7 text-center"><p className="font-bold">{zh ? "还没有找到你的市场" : "No Markets found yet"}</p><p className="mt-2 text-xs text-text-muted">{zh ? "让创建者把当前钱包加入邀请名单，受邀后会自动显示在这里。" : "Ask the creator to invite this wallet. Invited Markets will appear here automatically."}</p></div>
         : <div className="mt-7 grid min-w-0 gap-6 md:grid-cols-2">{myVaults.map((vault) => <VaultCard key={vault.address} vault={vault} zh={zh} onNavigate={onNavigate} />)}</div>}
       </section>

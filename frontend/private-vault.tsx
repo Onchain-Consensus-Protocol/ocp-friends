@@ -7,6 +7,7 @@ import { config, ERC20_ABI, PRIVATE_VAULT_ABI, PRIVATE_VAULT_FACTORY_ABI } from 
 import type { Language } from "./types";
 import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
+import { ErrorDialog } from "./components/ErrorDialog";
 import { decodeOutcomeMeanings } from "./outcome-metadata";
 
 type State = {
@@ -33,6 +34,17 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
 
   useEffect(() => { const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(timer); }, []);
 
+  const fetchMarketState = useCallback(async (provider: JsonRpcProvider, user: string): Promise<State> => {
+    const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
+    const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, factoryAddress] = await Promise.all([
+      vault.creator(), vault.resolutionMode(), vault.stakeEndTime(), vault.resolutionDeadline(), vault.minStake(), vault.stakeToken(), vault.finalized(), vault.resolvedOutcome(), vault.hasParticipated(user), vault.hasClaimed(user), vault.totalPrincipal(), vault.totalStakeYes(), vault.totalStakeNo(), vault.totalStakeInvalid(), vault.stakeOf(user), vault.factory(),
+    ]);
+    const token = new Contract(tokenAddress, ERC20_ABI, provider);
+    const factory = new Contract(factoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
+    const [decimals, symbol, meta] = await Promise.all([token.decimals(), token.symbol(), factory.getPrivateVaultMeta(vaultAddress)]);
+    return { creator, mode: Number(mode), stakeEnd: Number(stakeEnd), resolutionDeadline: Number(deadline), minStake, token: tokenAddress, symbol, decimals: Number(decimals), finalized, outcome: Number(outcome), allowed: true, participated, claimed, total, yes, no, invalid, userYes: stake[0], userNo: stake[1], userInvalid: stake[2], claim: meta[0], description: meta[1] };
+  }, [vaultAddress]);
+
   const load = useCallback(async () => {
     if (!validVault) { setState(null); setAccess("error"); return setError(zh ? "邀请链接中的 Market 地址无效。" : "The Market address in this invite link is invalid."); }
     if (!wallet.address) { setState(null); setError(""); setAccess("connect"); return; }
@@ -43,24 +55,29 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const configuredFactory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
       if (!await configuredFactory.isPrivateVault(vaultAddress)) { setState(null); setError(""); setAccess("denied"); return; }
       if (!await vault.allowedWallets(wallet.address)) { setState(null); setError(""); setAccess("denied"); return; }
-      const user = wallet.address;
-      const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, factoryAddress] = await Promise.all([
-        vault.creator(), vault.resolutionMode(), vault.stakeEndTime(), vault.resolutionDeadline(), vault.minStake(), vault.stakeToken(), vault.finalized(), vault.resolvedOutcome(), vault.hasParticipated(user), vault.hasClaimed(user), vault.totalPrincipal(), vault.totalStakeYes(), vault.totalStakeNo(), vault.totalStakeInvalid(), vault.stakeOf(user), vault.factory(),
-      ]);
-      const token = new Contract(tokenAddress, ERC20_ABI, provider);
-      const factory = new Contract(factoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
-      const [decimals, symbol, meta] = await Promise.all([token.decimals(), token.symbol(), factory.getPrivateVaultMeta(vaultAddress)]);
-      setState({ creator, mode: Number(mode), stakeEnd: Number(stakeEnd), resolutionDeadline: Number(deadline), minStake, token: tokenAddress, symbol, decimals: Number(decimals), finalized, outcome: Number(outcome), allowed: true, participated, claimed, total, yes, no, invalid, userYes: stake[0], userNo: stake[1], userInvalid: stake[2], claim: meta[0], description: meta[1] });
+      setState(await fetchMarketState(provider, wallet.address));
       setAccess("allowed");
       setError("");
     } catch (reason) { setState(null); setAccess("error"); setError(friendlyError(reason, zh)); }
-  }, [validVault, vaultAddress, wallet.address, zh]);
+  }, [validVault, vaultAddress, wallet.address, zh, fetchMarketState]);
   useEffect(() => { load(); }, [load]);
+
+  const refreshMarketState = useCallback(async () => {
+    if (!wallet.address) return;
+    try {
+      const provider = new JsonRpcProvider(config.rpcUrl);
+      setState(await fetchMarketState(provider, wallet.address));
+      setError("");
+    } catch (reason) {
+      // 交易已经上链时，刷新失败也保留当前页面，只弹出错误供用户重试。
+      setError(friendlyError(reason, zh));
+    }
+  }, [wallet.address, fetchMarketState, zh]);
 
   const transact = async (action: (vault: Contract) => Promise<unknown>) => {
     if (!wallet.signer) return wallet.connectWallet();
     setBusy(true); setError("");
-    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<unknown> }; await tx.wait(); await load(); }
+    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<unknown> }; await tx.wait(); await refreshMarketState(); }
     catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };
@@ -86,7 +103,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const token = new Contract(state.token, ERC20_ABI, wallet.signer);
       await (await token.approve(vaultAddress, value)).wait();
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer);
-      await (await vault.stake(side, value)).wait(); setAmount(""); await load();
+      await (await vault.stake(side, value)).wait(); setAmount(""); await refreshMarketState();
     } catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };
@@ -104,10 +121,10 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   return <main className="relative max-w-6xl mx-auto px-4 py-8 sm:px-6">
       <div className="friends-orb friends-orb-one" /><div className="friends-orb friends-orb-two" />
       <div className="friends-hero relative mb-6 overflow-hidden rounded-[2rem] p-6 sm:p-8"><Sparkles className="absolute right-7 top-7 h-9 w-9 text-fuchsia-400/80" /><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-3 py-1.5 text-xs font-bold text-fuchsia-200"><PartyPopper className="h-4 w-4" />OCP/<FriendsBrand /></div><div className="font-display text-2xl font-bold">{zh ? "你的私人派对" : "Your private party"}</div><p className="mt-2 text-sm text-text-muted">{zh ? "只有收到邀请的钱包才能进入和参与。" : "Only invited wallets can enter and participate."}</p></div>
+      {error && <ErrorDialog message={error} lang={lang} onClose={() => setError("")} />}
       {access !== "allowed" && <AccessGate access={access} error={error} zh={zh} onConnect={wallet.connectWallet} onNavigate={onNavigate} />}
       {access === "allowed" && <>
       {state?.mode === 1 && <div className="p-5 border-2 border-[#ff5a6f]/60 rounded-2xl bg-[#ff5a6f]/10 text-pink-100 mb-6"><div className="font-bold flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-[#ff7183]" />{zh ? "由 Market 创建者结算" : "Resolved by the Market creator"}</div><p className="mt-2 text-sm">{zh ? "创建者可以参与这个 Market，并且只有创建者能提交最终结果。" : "The creator may participate in this Market and has sole authority to submit the final result."}</p><p className="mt-1 font-bold">{zh ? "请只参加你信任的创建者发起的 Market。" : "Only participate if you trust the creator."}</p></div>}
-      {error && <div role="alert" className="p-4 mb-6 border border-danger bg-danger/5 rounded-xl text-danger text-xs break-words">{error}</div>}
       {!state ? (!error && <Message text={zh ? "正在加载私人 Market…" : "Loading private Market…"} />) : <>
         <section className="border border-border rounded-2xl p-6 mb-6"><div className="flex flex-col sm:flex-row sm:justify-between gap-4"><div><h1 className="text-2xl font-display font-bold">{state.claim || (zh ? "私人 Market" : "Private Market")}</h1><OutcomeDescription value={state.description} zh={zh} /></div><span className="self-start px-3 py-1 rounded-full border border-border text-xs font-bold">{state.finalized ? `${zh ? "已结算" : "FINAL"} · ${outcomeName(state.outcome)}` : staking ? (zh ? "参与中" : "STAKING") : (zh ? "待结算" : "RESOLUTION")}</span></div>
           <dl className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-xs font-mono"><Info label={zh ? "创建者" : "Created by"} value={short(state.creator)} /><Info label={zh ? "结算方式" : "Resolution method"} value={state.mode === 0 ? (zh ? "资金多数" : "AUTOMATIC_MAJORITY") : (zh ? "创建者结算" : "Creator Resolved")} /><Info label={zh ? "参与截止" : "Stake deadline"} value={formatDate(state.stakeEnd, zh)} /><Info label={zh ? "结算截止" : "Resolution deadline"} value={formatDate(state.resolutionDeadline, zh)} /></dl>
