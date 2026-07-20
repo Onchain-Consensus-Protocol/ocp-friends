@@ -60,18 +60,20 @@ export const WalletButton: React.FC<Props> = ({
           <AlertTriangle className="w-3 h-3" />
           {networkLabel}
         </span>
-        <Button size="sm" onClick={onConnect} variant="primary" className="!border-warning/60 !text-warning">
-          <Zap className="w-3.5 h-3.5 mr-1" />
-          {t(`切换到 ${targetNetworkLabel}`, `Switch to ${targetNetworkLabel}`)}
+        <Button size="sm" onClick={onConnect} variant="primary" className="!border-warning/60 !px-2 !text-warning sm:!px-3">
+          <Zap className="w-3.5 h-3.5" />
+          <span className="sm:hidden">{t("切换网络", "Switch")}</span>
+          <span className="hidden sm:inline">{t(`切换到 ${targetNetworkLabel}`, `Switch to ${targetNetworkLabel}`)}</span>
         </Button>
       </div>
     );
   }
 
   return (
-    <Button size="sm" onClick={onConnect} variant="primary">
-      <Wallet className="w-3.5 h-3.5 mr-2" />
-      {t("连接钱包", "Connect Wallet")}
+    <Button size="sm" onClick={onConnect} variant="primary" className="!px-2.5 sm:!px-3">
+      <Wallet className="w-3.5 h-3.5" />
+      <span className="sm:hidden">{t("连接", "Connect")}</span>
+      <span className="hidden sm:inline">{t("连接钱包", "Connect Wallet")}</span>
     </Button>
   );
 };

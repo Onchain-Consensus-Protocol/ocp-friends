@@ -57,7 +57,7 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  return <div className="friends-page min-h-screen text-text">
+  return <div className="friends-page min-h-screen pb-20 text-text md:pb-0">
     <FriendsHeader
       lang={lang}
       onToggleLang={() => setLang((value) => value === "zh" ? "en" : "zh")}
