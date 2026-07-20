@@ -213,3 +213,5 @@ export function useWallet() {
     disconnectWallet,
   };
 }
+
+export type WalletController = ReturnType<typeof useWallet>;
