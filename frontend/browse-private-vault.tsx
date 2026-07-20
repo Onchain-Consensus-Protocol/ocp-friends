@@ -86,7 +86,7 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         <Sparkles className="absolute right-8 top-8 h-12 w-12 text-fuchsia-400/60" />
       </section>
 
-      <section className="friends-card relative z-10 mt-8 rounded-3xl border border-fuchsia-400/25 bg-[#120921]/95 p-6 shadow-[0_0_55px_rgba(139,92,246,0.22)] backdrop-blur sm:p-8">
+      <section className="friends-card relative z-10 mt-8 min-w-0 overflow-hidden rounded-3xl border border-fuchsia-400/25 bg-[#120921]/95 p-6 shadow-[0_0_55px_rgba(139,92,246,0.22)] backdrop-blur sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3"><div className="rounded-2xl bg-gradient-to-br from-[#ff7628] via-[#ff3cac] to-[#8257f5] p-3 text-white"><UsersRound className="h-6 w-6" /></div><div><h2 className="font-display text-xl font-bold">{zh ? "我的市场" : "My Markets"}</h2><p className="mt-1 text-xs text-text-muted">{zh ? "只显示当前钱包有权限进入的市场" : "Only Markets available to the connected wallet"}</p></div></div>
           {wallet.connected && <Button onClick={() => void loadMyVaults()} disabled={loadingVaults} variant="outline" size="sm"><RefreshCw className={`h-3.5 w-3.5 ${loadingVaults ? "animate-spin" : ""}`} />{zh ? "刷新" : "Refresh"}</Button>}
@@ -96,7 +96,7 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         : loadingVaults ? <div className="mt-8 text-center text-sm text-text-muted">{zh ? "正在链上查找你的市场…" : "Finding your Markets onchain…"}</div>
         : vaultsError ? <div role="alert" className="mt-6 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{vaultsError}</div>
         : myVaults.length === 0 ? <div className="mt-7 rounded-2xl border border-dashed border-fuchsia-400/25 p-7 text-center"><p className="font-bold">{zh ? "还没有找到你的市场" : "No Markets found yet"}</p><p className="mt-2 text-xs text-text-muted">{zh ? "让创建者把当前钱包加入邀请名单，受邀后会自动显示在这里。" : "Ask the creator to invite this wallet. Invited Markets will appear here automatically."}</p></div>
-        : <div className="mt-7 grid gap-6 md:grid-cols-2">{myVaults.map((vault) => <VaultCard key={vault.address} vault={vault} zh={zh} onNavigate={onNavigate} />)}</div>}
+        : <div className="mt-7 grid min-w-0 gap-6 md:grid-cols-2">{myVaults.map((vault) => <VaultCard key={vault.address} vault={vault} zh={zh} onNavigate={onNavigate} />)}</div>}
       </section>
   </main>;
 }
@@ -118,11 +118,12 @@ function VaultCard({ vault, zh, onNavigate }: { key?: React.Key; vault: MyVault;
   };
   const outcome = ["—", "YES", "NO", "INVALID"][vault.outcome] ?? "—";
   const href = `/private-vault.html?vault=${vault.address}`;
-  return <a href={href} onClick={(event) => { event.preventDefault(); onNavigate(href); }} className="friends-card group rounded-2xl border border-fuchsia-400/20 bg-[#0d0618]/80 p-5 hover:border-fuchsia-400/50">
+  const shortAddress = `${vault.address.slice(0, 8)}…${vault.address.slice(-6)}`;
+  return <a href={href} onClick={(event) => { event.preventDefault(); onNavigate(href); }} className="friends-card group block w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-fuchsia-400/20 bg-[#0d0618]/80 p-5 hover:border-fuchsia-400/50">
     <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${stageStyle[vault.stage]}`}>{stageLabel[vault.stage]}</span><ArrowRight className="h-4 w-4 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-fuchsia-300" /></div>
     <h3 className="mt-4 line-clamp-2 font-display text-lg font-bold">{vault.claim}</h3>
     <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-text-muted"><span className="rounded-md border border-border px-2 py-1">{vault.mode === 0 ? (zh ? "资金多数" : "AUTOMATIC_MAJORITY") : (zh ? "创建者结算" : "Creator Resolved")}</span>{vault.outcome > 0 && <span className="rounded-md border border-border px-2 py-1">{zh ? "结果" : "Result"}: {outcome}</span>}</div>
-    <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">{vault.stage === "claimable" ? <Gift className="h-4 w-4 text-success" /> : <Clock3 className="h-4 w-4" />}<span>{vault.stage === "ended" || vault.stage === "claimable" ? (zh ? "点击查看详情" : "Open details") : `${zh ? "参与截止" : "Stake ends"}: ${new Date(vault.stakeEnd * 1000).toLocaleString(zh ? "zh-CN" : "en-US")}`}</span></div>
-    <div className="mt-3 truncate font-mono text-[10px] text-text-muted">{vault.address}</div>
+    <div className="mt-4 flex min-w-0 items-center gap-2 text-xs text-text-muted">{vault.stage === "claimable" ? <Gift className="h-4 w-4 shrink-0 text-success" /> : <Clock3 className="h-4 w-4 shrink-0" />}<span className="min-w-0">{vault.stage === "ended" || vault.stage === "claimable" ? (zh ? "点击查看详情" : "Open details") : `${zh ? "参与截止" : "Stake ends"}: ${new Date(vault.stakeEnd * 1000).toLocaleString(zh ? "zh-CN" : "en-US")}`}</span></div>
+    <div className="mt-3 min-w-0 truncate font-mono text-[10px] text-text-muted"><span className="sm:hidden">{shortAddress}</span><span className="hidden sm:inline">{vault.address}</span></div>
   </a>;
 }
