@@ -8,6 +8,7 @@ import type { Language } from "./types";
 import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
 import { ErrorDialog } from "./components/ErrorDialog";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { decodeOutcomeMeanings } from "./outcome-metadata";
 
 type State = {
@@ -29,6 +30,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   const [manageWallets, setManageWallets] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmation, setConfirmation] = useState<{ message: string; action: () => void } | null>(null);
   const [access, setAccess] = useState<"connect" | "checking" | "denied" | "allowed" | "error">("checking");
   const zh = lang === "zh";
 
@@ -90,14 +92,13 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       ? `${outcomeName(resolveOutcome)} 当前无人持仓，不能选择该结果。请选择有持仓的一方或 INVALID。`
       : `${outcomeName(resolveOutcome)} has no holders. Choose a side with holders or INVALID.`);
     const message = zh ? "该结果不可更改。确认提交吗？" : "This result is final and cannot be changed. Confirm?";
-    if (window.confirm(message)) void transact((vault) => vault.resolveByCreator(resolveOutcome));
+    setConfirmation({ message, action: () => void transact((vault) => vault.resolveByCreator(resolveOutcome)) });
   };
 
-  const stake = async (side: number) => {
+  const executeStake = async (side: number) => {
     if (!state || !wallet.signer) return wallet.connectWallet();
     setBusy(true); setError("");
     try {
-      if (state.mode === 1 && !window.confirm(zh ? "创建者可能持有这个 Market 的仓位，并将决定最终结果。是否继续？" : "The creator may have a financial position in this Market and will determine the final outcome. Continue?")) return;
       const value = parseUnits(amount || "0", state.decimals);
       if (value <= 0n) throw new Error("Amount below min stake");
       const token = new Contract(state.token, ERC20_ABI, wallet.signer);
@@ -106,6 +107,18 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       await (await vault.stake(side, value)).wait(); setAmount(""); await refreshMarketState();
     } catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
+  };
+
+  const stake = (side: number) => {
+    if (!state) return;
+    if (state.mode === 1) {
+      setConfirmation({
+        message: zh ? "创建者可能持有这个 Market 的仓位，并将决定最终结果。是否继续？" : "The creator may have a financial position in this Market and will determine the final outcome. Continue?",
+        action: () => void executeStake(side),
+      });
+      return;
+    }
+    void executeStake(side);
   };
 
   const staking = state && !state.finalized && now < state.stakeEnd;
@@ -122,6 +135,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       <div className="friends-orb friends-orb-one" /><div className="friends-orb friends-orb-two" />
       <div className="friends-hero relative mb-6 overflow-hidden rounded-[2rem] p-6 sm:p-8"><Sparkles className="absolute right-7 top-7 h-9 w-9 text-fuchsia-400/80" /><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-3 py-1.5 text-xs font-bold text-fuchsia-200"><PartyPopper className="h-4 w-4" />OCP/<FriendsBrand /></div><div className="font-display text-2xl font-bold">{zh ? "你的私人派对" : "Your private party"}</div><p className="mt-2 text-sm text-text-muted">{zh ? "只有收到邀请的钱包才能进入和参与。" : "Only invited wallets can enter and participate."}</p></div>
       {error && <ErrorDialog message={error} lang={lang} onClose={() => setError("")} />}
+      {confirmation && <ConfirmDialog message={confirmation.message} lang={lang} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation.action; setConfirmation(null); action(); }} />}
       {access !== "allowed" && <AccessGate access={access} error={error} zh={zh} onConnect={wallet.connectWallet} onNavigate={onNavigate} />}
       {access === "allowed" && <>
       {state?.mode === 1 && <div className="p-5 border-2 border-[#ff5a6f]/60 rounded-2xl bg-[#ff5a6f]/10 text-pink-100 mb-6"><div className="font-bold flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-[#ff7183]" />{zh ? "由 Market 创建者结算" : "Resolved by the Market creator"}</div><p className="mt-2 text-sm">{zh ? "创建者可以参与这个 Market，并且只有创建者能提交最终结果。" : "The creator may participate in this Market and has sole authority to submit the final result."}</p><p className="mt-1 font-bold">{zh ? "请只参加你信任的创建者发起的 Market。" : "Only participate if you trust the creator."}</p></div>}
