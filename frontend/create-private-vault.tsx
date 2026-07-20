@@ -88,7 +88,7 @@ export function CreatePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         </div>
         <div className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-400/10 p-4 text-sm text-fuchsia-100">{zh ? "玩家只能选择 YES 或 NO。INVALID 是平局、取消、无法判断或超时时的全额退款结果，不能提前质押。" : "Players can stake only YES or NO. INVALID is a full-refund result for a tie, cancellation, uncertainty, or timeout; it cannot be staked."}</div>
         <Field label={zh ? "结算方式" : "Resolution Method"}><div className="grid sm:grid-cols-2 gap-3">
-          <Mode selected={mode === 0} onClick={() => setMode(0)} title="AUTOMATIC_MAJORITY" text={zh ? "YES 或 NO 严格超过 50% 时获胜；平局或无人参与时 INVALID 并退款。" : "YES or NO wins above 50%; a tie or no participation resolves INVALID with refunds."} />
+          <Mode selected={mode === 0} onClick={() => setMode(0)} title={zh ? "资金多数" : "AUTOMATIC_MAJORITY"} text={zh ? "YES 或 NO 严格超过 50% 时获胜；平局或无人参与时 INVALID 并退款。" : "YES or NO wins above 50%; a tie or no participation resolves INVALID with refunds."} />
           <Mode selected={mode === 1} onClick={() => setMode(1)} title={zh ? "创建者结算" : "Creator Resolved"} text={zh ? "参与结束后，由创建者提交 YES、NO 或 INVALID。" : "The creator submits YES, NO, or INVALID after staking ends."} />
         </div></Field>
         {mode === 1 && <div className="p-4 rounded-xl border-2 border-fuchsia-400/60 bg-fuchsia-400/10 text-fuchsia-100 text-sm"><strong>{zh ? "信任提示：" : "Trust notice:"}</strong>{zh ? "创建者也可以参与，并且只有创建者能提交最终结果。请只参加你信任的朋友创建的市场。" : " The creator may stake and has sole authority to submit the final result. Only participate if you trust the creator."}</div>}

@@ -110,7 +110,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       {error && <div role="alert" className="p-4 mb-6 border border-danger bg-danger/5 rounded-xl text-danger text-xs break-words">{error}</div>}
       {!state ? (!error && <Message text={zh ? "正在加载私人 Market…" : "Loading private Market…"} />) : <>
         <section className="border border-border rounded-2xl p-6 mb-6"><div className="flex flex-col sm:flex-row sm:justify-between gap-4"><div><h1 className="text-2xl font-display font-bold">{state.claim || (zh ? "私人 Market" : "Private Market")}</h1><OutcomeDescription value={state.description} zh={zh} /></div><span className="self-start px-3 py-1 rounded-full border border-border text-xs font-bold">{state.finalized ? `${zh ? "已结算" : "FINAL"} · ${outcomeName(state.outcome)}` : staking ? (zh ? "参与中" : "STAKING") : (zh ? "待结算" : "RESOLUTION")}</span></div>
-          <dl className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-xs font-mono"><Info label={zh ? "创建者" : "Created by"} value={short(state.creator)} /><Info label={zh ? "结算方式" : "Resolution method"} value={state.mode === 0 ? "AUTOMATIC_MAJORITY" : (zh ? "创建者结算" : "Creator Resolved")} /><Info label={zh ? "参与截止" : "Stake deadline"} value={formatDate(state.stakeEnd, zh)} /><Info label={zh ? "结算截止" : "Resolution deadline"} value={formatDate(state.resolutionDeadline, zh)} /></dl>
+          <dl className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-xs font-mono"><Info label={zh ? "创建者" : "Created by"} value={short(state.creator)} /><Info label={zh ? "结算方式" : "Resolution method"} value={state.mode === 0 ? (zh ? "资金多数" : "AUTOMATIC_MAJORITY") : (zh ? "创建者结算" : "Creator Resolved")} /><Info label={zh ? "参与截止" : "Stake deadline"} value={formatDate(state.stakeEnd, zh)} /><Info label={zh ? "结算截止" : "Resolution deadline"} value={formatDate(state.resolutionDeadline, zh)} /></dl>
           <div className="mt-5 flex flex-wrap items-center gap-4"><button onClick={() => navigator.clipboard.writeText(window.location.href)} className="text-xs text-accent inline-flex items-center gap-1"><Copy className="w-3 h-3" />{zh ? "复制邀请链接" : "Copy invite link"}</button><a href={`/private-vault-rules.html?mode=${state.mode}&lang=${lang}`} onClick={(event) => { event.preventDefault(); onNavigate(`/private-vault-rules.html?mode=${state.mode}&lang=${lang}`); }} className="text-xs font-bold text-accent hover:underline">{zh ? "查看结算方式 →" : "View settlement method →"}</a></div>
         </section>
         <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} zh={zh} />
@@ -158,7 +158,7 @@ function ResolutionMethod({ mode, stakeEnd, resolutionDeadline, zh }: { mode: nu
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="text-xl font-display font-bold">{zh ? "结算方式" : "Resolution Method"}</h2>
       <span className={`self-start rounded-full px-3 py-1 text-xs font-bold ${mode === 0 ? "bg-accent/15 text-accent" : "bg-fuchsia-400/15 text-fuchsia-200"}`}>
-        {mode === 0 ? "AUTOMATIC_MAJORITY" : (zh ? "创建者结算" : "CREATOR RESOLVED")}
+        {mode === 0 ? (zh ? "资金多数" : "AUTOMATIC_MAJORITY") : (zh ? "创建者结算" : "CREATOR RESOLVED")}
       </span>
     </div>
     {mode === 0 ? <div className="mt-4 space-y-2 text-sm leading-6 text-text-muted">
