@@ -56,14 +56,15 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
 
   useEffect(() => { const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(timer); }, []);
 
-  const fetchMarketState = useCallback(async (provider: ContractRunner, user: string): Promise<State> => {
+  const fetchMarketState = useCallback(async (provider: ContractRunner, user: string, blockTag?: number): Promise<State> => {
     const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
+    const readOptions = blockTag === undefined ? {} : { blockTag };
     const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, factoryAddress] = await Promise.all([
-      vault.creator(), vault.resolutionMode(), vault.stakeEndTime(), vault.resolutionDeadline(), vault.minStake(), vault.stakeToken(), vault.finalized(), vault.resolvedOutcome(), vault.hasParticipated(user), vault.hasClaimed(user), vault.totalPrincipal(), vault.totalStakeYes(), vault.totalStakeNo(), vault.totalStakeInvalid(), vault.stakeOf(user), vault.factory(),
+      vault.creator(readOptions), vault.resolutionMode(readOptions), vault.stakeEndTime(readOptions), vault.resolutionDeadline(readOptions), vault.minStake(readOptions), vault.stakeToken(readOptions), vault.finalized(readOptions), vault.resolvedOutcome(readOptions), vault.hasParticipated(user, readOptions), vault.hasClaimed(user, readOptions), vault.totalPrincipal(readOptions), vault.totalStakeYes(readOptions), vault.totalStakeNo(readOptions), vault.totalStakeInvalid(readOptions), vault.stakeOf(user, readOptions), vault.factory(readOptions),
     ]);
     const token = new Contract(tokenAddress, ERC20_ABI, provider);
     const factory = new Contract(factoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
-    const [decimals, symbol, meta] = await Promise.all([token.decimals(), token.symbol(), factory.getPrivateVaultMeta(vaultAddress)]);
+    const [decimals, symbol, meta] = await Promise.all([token.decimals(readOptions), token.symbol(readOptions), factory.getPrivateVaultMeta(vaultAddress, readOptions)]);
     return { creator, mode: Number(mode), stakeEnd: Number(stakeEnd), resolutionDeadline: Number(deadline), minStake, token: tokenAddress, symbol, decimals: Number(decimals), finalized, outcome: Number(outcome), allowed: true, participated, claimed, total, yes, no, invalid, userYes: stake[0], userNo: stake[1], userInvalid: stake[2], claim: meta[0], description: meta[1] };
   }, [vaultAddress]);
 
@@ -102,23 +103,32 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   }, [validVault, vaultAddress, wallet.address, wallet.signer, zh, fetchMarketState, refreshInvitedWallets]);
   useEffect(() => { load(); }, [load]);
 
-  const refreshMarketState = useCallback(async () => {
+  const refreshMarketState = useCallback(async (blockTag?: number, refreshInvites = false, silent = false) => {
     if (!wallet.address) return;
     try {
       const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
-      setState(await fetchMarketState(provider, wallet.address));
-      void refreshInvitedWallets(provider);
+      setState(await fetchMarketState(provider, wallet.address, blockTag));
+      if (refreshInvites) void refreshInvitedWallets(provider);
       setError("");
     } catch (reason) {
       // 交易已经上链时，刷新失败也保留当前页面，只弹出错误供用户重试。
-      setError(friendlyError(reason, zh));
+      if (!silent) setError(friendlyError(reason, zh));
     }
   }, [wallet.address, wallet.signer, fetchMarketState, refreshInvitedWallets, zh]);
+
+  useEffect(() => {
+    if (access !== "allowed" || !wallet.address) return;
+    const timer = window.setInterval(() => {
+      // 只更新链上 Market 状态，不重新加载页面，也不反复扫描邀请事件。
+      if (document.visibilityState === "visible" && !busy) void refreshMarketState(undefined, false, true);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [access, wallet.address, busy, refreshMarketState]);
 
   const transact = async (action: (vault: Contract) => Promise<unknown>) => {
     if (!wallet.signer) return wallet.connectWallet();
     setBusy(true); setError("");
-    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<unknown> }; await tx.wait(); await refreshMarketState(); }
+    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<{ blockNumber?: number } | null> }; const receipt = await tx.wait(); await refreshMarketState(receipt?.blockNumber, true); }
     catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };
@@ -143,7 +153,10 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const token = new Contract(state.token, ERC20_ABI, wallet.signer);
       await (await token.approve(vaultAddress, value)).wait();
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer);
-      await (await vault.stake(side, value)).wait(); setAmount(""); await refreshMarketState();
+      const receipt = await (await vault.stake(side, value)).wait();
+      setAmount("");
+      // 按质押交易所在区块读取，避免钱包 RPC 的 latest 缓存返回交易前数据。
+      await refreshMarketState(receipt?.blockNumber);
     } catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };
