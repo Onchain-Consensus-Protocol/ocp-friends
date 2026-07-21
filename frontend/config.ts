@@ -4,7 +4,7 @@ export const config = {
   privateVaultFactoryAddress: env?.VITE_PRIVATE_VAULT_FACTORY_ADDRESS ?? "0x0000000000000000000000000000000000000000",
   depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
-  rpcUrl: env?.VITE_RPC_URL ?? "https://mainnet.base.org",
+  rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
   explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
 };
 
