@@ -136,8 +136,19 @@ function MobileNetwork() {
       <div className="relative z-10 flex items-center justify-around gap-2">
         {group.people.map((id) => <Avatar key={id} person={PEOPLE.find((person) => person.id === id)!} compact />)}
       </div>
-      <div className={`relative z-10 mx-auto mt-5 grid gap-3 ${group.markets.length > 1 ? "sm:grid-cols-2" : "max-w-sm"}`}>
-        {group.markets.map((market) => <MarketCard key={market.title} market={market} large={market.title === "Alex like Jessica?"} />)}
+      <div className="relative z-10 mx-auto mt-5 max-w-sm divide-y" style={{ borderColor: `${group.color}55` }}>
+        {group.markets.map((market) => {
+          const no = 100 - market.yes;
+          const large = market.title === "Alex like Jessica?";
+          return <article key={market.title} className="py-4 first:pt-2 last:pb-1">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: group.color }}><LockKeyhole size={12} /> Invited only</div>
+            <h2 className={`${large ? "text-xl" : "text-lg"} font-sans font-bold tracking-tight text-white`}>{market.title}</h2>
+            <div className="mt-4 flex h-10 overflow-hidden rounded-lg text-center font-sans text-xs font-bold text-white">
+              <div className="flex items-center justify-center bg-gradient-to-r from-emerald-500/80 to-emerald-400/80" style={{ width: `${market.yes}%` }}>YES {large && `${market.yes}%`}</div>
+              <div className="flex items-center justify-center bg-gradient-to-r from-pink-700/90 to-pink-500/80" style={{ width: `${no}%` }}>NO {large && `${no}%`}</div>
+            </div>
+          </article>;
+        })}
       </div>
     </section>)}
   </div>;
