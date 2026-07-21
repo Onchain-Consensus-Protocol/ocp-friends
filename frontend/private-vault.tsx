@@ -9,6 +9,7 @@ import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
 import { ErrorDialog } from "./components/ErrorDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ChoiceComparison } from "./components/ChoiceComparison";
 import { decodeOutcomeMeanings } from "./outcome-metadata";
 
 type State = {
@@ -207,24 +208,5 @@ function ResolutionMethod({ mode, stakeEnd, resolutionDeadline, zh }: { mode: nu
   </section>;
 }
 function Pool({ side, amount, color }: { side: string; amount: string; color: string }) { return <div className="p-4 border border-border rounded-xl"><div className={`font-bold ${color}`}>{side}</div><div className="font-mono mt-2 text-sm">{amount}</div></div>; }
-function ChoiceComparison({ yes, no }: { yes: bigint; no: bigint }) {
-  const total = yes + no;
-  const yesPercent = total > 0n ? Number(yes * 1000n / total) / 10 : 0;
-  const noPercent = total > 0n ? Math.round((100 - yesPercent) * 10) / 10 : 0;
-
-  return <div aria-label={`YES ${yesPercent}%, NO ${noPercent}%`}>
-    <div className="mb-2 flex items-center justify-between font-mono text-xs font-bold">
-      <span className="text-success">YES · {yesPercent.toFixed(1)}%</span>
-      <span className="text-danger">{noPercent.toFixed(1)}% · NO</span>
-    </div>
-    <div className="relative h-5 overflow-hidden rounded-full border border-white/10 bg-white/5 shadow-inner">
-      {total > 0n ? <div className="flex h-full w-full">
-        <div className="h-full bg-gradient-to-r from-emerald-500 to-[#39f58a] transition-[width] duration-500" style={{ width: `${yesPercent}%` }} />
-        <div className="h-full bg-gradient-to-r from-[#ff4fa3] to-fuchsia-600 transition-[width] duration-500" style={{ width: `${noPercent}%` }} />
-      </div> : <div className="h-full w-full bg-white/5" />}
-      <span className="absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-[#120921] font-display text-[9px] font-bold text-white shadow-[0_0_14px_rgba(255,255,255,0.12)]">VS</span>
-    </div>
-  </div>;
-}
 function Message({ text }: { text: string }) { return <div className="min-h-[40vh] flex items-center justify-center text-text-muted font-mono">{text}</div>; }
 function short(value: string) { return `${value.slice(0, 6)}…${value.slice(-4)}`; }

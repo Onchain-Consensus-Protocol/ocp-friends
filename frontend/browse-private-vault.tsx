@@ -8,6 +8,7 @@ import type { Language } from "./types";
 import type { WalletController } from "./useWallet";
 import { friendlyError } from "./friendly-error";
 import { ErrorDialog } from "./components/ErrorDialog";
+import { ChoiceComparison } from "./components/ChoiceComparison";
 
 type VaultStage = "invited" | "active" | "settlement" | "claimable" | "ended";
 type MyVault = {
@@ -17,6 +18,8 @@ type MyVault = {
   outcome: number;
   stakeEnd: number;
   stage: VaultStage;
+  yes: bigint;
+  no: bigint;
 };
 
 const STAGE_ORDER: Record<VaultStage, number> = { claimable: 0, settlement: 1, active: 2, invited: 3, ended: 4 };
@@ -50,10 +53,10 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         try {
           const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
           if (!await vault.allowedWallets(wallet.address)) return null;
-          const [participated, finalized, claimed, stakeEndRaw, modeRaw, outcomeRaw, stake, meta] = await Promise.all([
+          const [participated, finalized, claimed, stakeEndRaw, modeRaw, outcomeRaw, stake, meta, yes, no] = await Promise.all([
             vault.hasParticipated(wallet.address), vault.finalized(), vault.hasClaimed(wallet.address),
             vault.stakeEndTime(), vault.resolutionMode(), vault.resolvedOutcome(), vault.stakeOf(wallet.address),
-            factory.getPrivateVaultMeta(vaultAddress),
+            factory.getPrivateVaultMeta(vaultAddress), vault.totalStakeYes(), vault.totalStakeNo(),
           ]);
           const stakeEnd = Number(stakeEndRaw);
           const outcome = Number(outcomeRaw);
@@ -64,7 +67,7 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
           else if (now >= stakeEnd) stage = "settlement";
           else if (participated) stage = "active";
           else stage = "invited";
-          return { address: vaultAddress, claim: String(meta[0]) || "Private Market", mode: Number(modeRaw), outcome, stakeEnd, stage };
+          return { address: vaultAddress, claim: String(meta[0]) || "Private Market", mode: Number(modeRaw), outcome, stakeEnd, stage, yes, no };
         } catch { return null; }
       }));
       setMyVaults(results.filter((item): item is MyVault => item !== null).sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] || b.stakeEnd - a.stakeEnd));
@@ -124,6 +127,7 @@ function VaultCard({ vault, zh, onNavigate }: { key?: React.Key; vault: MyVault;
     <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${stageStyle[vault.stage]}`}>{stageLabel[vault.stage]}</span><ArrowRight className="h-4 w-4 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-fuchsia-300" /></div>
     <h3 className="mt-4 line-clamp-2 font-display text-lg font-bold">{vault.claim}</h3>
     <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-text-muted"><span className="rounded-md border border-border px-2 py-1">{vault.mode === 0 ? (zh ? "资金多数" : "AUTOMATIC_MAJORITY") : (zh ? "创建者结算" : "Creator Resolved")}</span>{vault.outcome > 0 && <span className="rounded-md border border-border px-2 py-1">{zh ? "结果" : "Result"}: {outcome}</span>}</div>
+    <div className="mt-4"><ChoiceComparison yes={vault.yes} no={vault.no} compact /></div>
     <div className="mt-4 flex min-w-0 items-center gap-2 text-xs text-text-muted">{vault.stage === "claimable" ? <Gift className="h-4 w-4 shrink-0 text-success" /> : <Clock3 className="h-4 w-4 shrink-0" />}<span className="min-w-0">{vault.stage === "ended" || vault.stage === "claimable" ? (zh ? "点击查看详情" : "Open details") : `${zh ? "参与截止" : "Stake ends"}: ${new Date(vault.stakeEnd * 1000).toLocaleString(zh ? "zh-CN" : "en-US")}`}</span></div>
     <div className="mt-3 min-w-0 truncate font-mono text-[10px] text-text-muted"><span className="sm:hidden">{shortAddress}</span><span className="hidden sm:inline">{vault.address}</span></div>
   </a>;
