@@ -146,7 +146,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
         </section>
         <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} zh={zh} />
         <div className="grid lg:grid-cols-3 gap-6">
-          <section className="friends-card lg:col-span-2 border border-fuchsia-400/20 bg-[#120921]/90 rounded-2xl p-6"><h2 className="font-display font-bold mb-2">{zh ? "大家目前的选择" : "Current choices"}</h2><p className="mb-5 text-xs text-text-muted">{zh ? "玩家只能选择 YES 或 NO；INVALID 是退款结算状态。" : "Players can choose only YES or NO; INVALID is a refund outcome."}</p><div className="grid sm:grid-cols-2 gap-3"><Pool side="YES" amount={fmt(state.yes)} color="text-success" /><Pool side="NO" amount={fmt(state.no)} color="text-danger" /></div><div className="mt-4 text-sm font-mono">{zh ? "总参与金额：" : "Total joined: "}<strong>{fmt(state.total)}</strong></div></section>
+          <section className="friends-card lg:col-span-2 border border-fuchsia-400/20 bg-[#120921]/90 rounded-2xl p-6"><h2 className="font-display font-bold mb-2">{zh ? "大家目前的选择" : "Current choices"}</h2><p className="mb-5 text-xs text-text-muted">{zh ? "玩家只能选择 YES 或 NO；INVALID 是退款结算状态。" : "Players can choose only YES or NO; INVALID is a refund outcome."}</p><ChoiceComparison yes={state.yes} no={state.no} /><div className="mt-5 grid sm:grid-cols-2 gap-3"><Pool side="YES" amount={fmt(state.yes)} color="text-success" /><Pool side="NO" amount={fmt(state.no)} color="text-danger" /></div><div className="mt-4 text-sm font-mono">{zh ? "总参与金额：" : "Total joined: "}<strong>{fmt(state.total)}</strong></div></section>
           <section className="border border-border rounded-2xl p-6"><h2 className="font-display font-bold mb-4">{zh ? "你的权限" : "Your Access"}</h2>{!wallet.connected ? <Button onClick={wallet.connectWallet} variant="outline">{zh ? "连接钱包" : "Connect wallet"}</Button> : state.allowed ? <div className="text-success flex gap-2 items-center"><ShieldCheck className="w-5 h-5" /><strong>{zh ? "你已受邀。" : "You are invited."}</strong></div> : <div className="text-danger text-sm"><strong>{zh ? "这是私人 Market。" : "This is a private Market."}</strong><p className="mt-2">{zh ? "当前钱包不在参与名单中。" : "Your wallet is not on the participant list."}</p></div>}<div className="mt-5 text-xs font-mono text-text-muted">{zh ? "你的仓位：" : "Your position: "}YES {fmt(state.userYes)} · NO {fmt(state.userNo)}</div></section>
         </div>
         <section className="border border-border rounded-2xl p-6 mt-6"><h2 className="font-display font-bold text-xl">{zh ? "Market 操作" : "Market Actions"}</h2>
@@ -207,5 +207,24 @@ function ResolutionMethod({ mode, stakeEnd, resolutionDeadline, zh }: { mode: nu
   </section>;
 }
 function Pool({ side, amount, color }: { side: string; amount: string; color: string }) { return <div className="p-4 border border-border rounded-xl"><div className={`font-bold ${color}`}>{side}</div><div className="font-mono mt-2 text-sm">{amount}</div></div>; }
+function ChoiceComparison({ yes, no }: { yes: bigint; no: bigint }) {
+  const total = yes + no;
+  const yesPercent = total > 0n ? Number(yes * 1000n / total) / 10 : 0;
+  const noPercent = total > 0n ? Math.round((100 - yesPercent) * 10) / 10 : 0;
+
+  return <div aria-label={`YES ${yesPercent}%, NO ${noPercent}%`}>
+    <div className="mb-2 flex items-center justify-between font-mono text-xs font-bold">
+      <span className="text-success">YES · {yesPercent.toFixed(1)}%</span>
+      <span className="text-danger">{noPercent.toFixed(1)}% · NO</span>
+    </div>
+    <div className="relative h-5 overflow-hidden rounded-full border border-white/10 bg-white/5 shadow-inner">
+      {total > 0n ? <div className="flex h-full w-full">
+        <div className="h-full bg-gradient-to-r from-emerald-500 to-[#39f58a] transition-[width] duration-500" style={{ width: `${yesPercent}%` }} />
+        <div className="h-full bg-gradient-to-r from-[#ff4fa3] to-fuchsia-600 transition-[width] duration-500" style={{ width: `${noPercent}%` }} />
+      </div> : <div className="h-full w-full bg-white/5" />}
+      <span className="absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-[#120921] font-display text-[9px] font-bold text-white shadow-[0_0_14px_rgba(255,255,255,0.12)]">VS</span>
+    </div>
+  </div>;
+}
 function Message({ text }: { text: string }) { return <div className="min-h-[40vh] flex items-center justify-center text-text-muted font-mono">{text}</div>; }
 function short(value: string) { return `${value.slice(0, 6)}…${value.slice(-4)}`; }
