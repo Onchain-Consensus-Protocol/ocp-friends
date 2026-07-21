@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Contract, JsonRpcProvider, formatUnits, isAddress, parseUnits } from "ethers";
+import { Contract, JsonRpcProvider, formatUnits, isAddress, parseUnits, type ContractRunner } from "ethers";
 import { AlertTriangle, Copy, KeyRound, PartyPopper, ShieldCheck, Sparkles } from "lucide-react";
 import { FriendsBrand } from "./components/FriendsBrand";
 import { Button } from "./components/Button";
@@ -37,7 +37,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
 
   useEffect(() => { const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(timer); }, []);
 
-  const fetchMarketState = useCallback(async (provider: JsonRpcProvider, user: string): Promise<State> => {
+  const fetchMarketState = useCallback(async (provider: ContractRunner, user: string): Promise<State> => {
     const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
     const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, factoryAddress] = await Promise.all([
       vault.creator(), vault.resolutionMode(), vault.stakeEndTime(), vault.resolutionDeadline(), vault.minStake(), vault.stakeToken(), vault.finalized(), vault.resolvedOutcome(), vault.hasParticipated(user), vault.hasClaimed(user), vault.totalPrincipal(), vault.totalStakeYes(), vault.totalStakeNo(), vault.totalStakeInvalid(), vault.stakeOf(user), vault.factory(),
@@ -53,7 +53,8 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
     if (!wallet.address) { setState(null); setError(""); setAccess("connect"); return; }
     setAccess("checking");
     try {
-      const provider = new JsonRpcProvider(config.rpcUrl);
+      // 已连接时复用钱包节点，避免公共 RPC 限流导致交易成功后详情页打不开。
+      const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
       const configuredFactory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
       if (!await configuredFactory.isPrivateVault(vaultAddress)) { setState(null); setError(""); setAccess("denied"); return; }
@@ -62,20 +63,20 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       setAccess("allowed");
       setError("");
     } catch (reason) { setState(null); setAccess("error"); setError(friendlyError(reason, zh)); }
-  }, [validVault, vaultAddress, wallet.address, zh, fetchMarketState]);
+  }, [validVault, vaultAddress, wallet.address, wallet.signer, zh, fetchMarketState]);
   useEffect(() => { load(); }, [load]);
 
   const refreshMarketState = useCallback(async () => {
     if (!wallet.address) return;
     try {
-      const provider = new JsonRpcProvider(config.rpcUrl);
+      const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       setState(await fetchMarketState(provider, wallet.address));
       setError("");
     } catch (reason) {
       // 交易已经上链时，刷新失败也保留当前页面，只弹出错误供用户重试。
       setError(friendlyError(reason, zh));
     }
-  }, [wallet.address, fetchMarketState, zh]);
+  }, [wallet.address, wallet.signer, fetchMarketState, zh]);
 
   const transact = async (action: (vault: Contract) => Promise<unknown>) => {
     if (!wallet.signer) return wallet.connectWallet();

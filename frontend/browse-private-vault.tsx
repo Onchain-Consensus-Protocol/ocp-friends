@@ -40,7 +40,8 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
     setLoadingVaults(true);
     setVaultsError("");
     try {
-      const provider = new JsonRpcProvider(config.rpcUrl);
+      // 浏览页必须连接钱包；直接使用钱包节点读取，避免公共 RPC 的限流和跨域波动。
+      const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       const factory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
       const count = Number(await factory.privateVaultCount());
       const allAddresses: string[] = [];
@@ -75,7 +76,7 @@ export function BrowsePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
       setMyVaults([]);
       setVaultsError(friendlyError(reason, zh));
     } finally { setLoadingVaults(false); }
-  }, [wallet.address, zh]);
+  }, [wallet.address, wallet.signer, zh]);
 
   useEffect(() => { void loadMyVaults(); }, [loadMyVaults]);
 
