@@ -6,16 +6,19 @@ import { RulesPage } from "./private-vault-rules";
 import { CreatePrivateVault } from "./create-private-vault";
 import { BrowsePrivateVault } from "./browse-private-vault";
 import { PrivateVaultPage } from "./private-vault";
+import { FriendsHome } from "./friends-home";
 import { useWallet } from "./useWallet";
 import type { Language } from "./types";
 
-type Route = "play" | "create" | "browse" | "vault";
+type Route = "home" | "play" | "create" | "browse" | "vault";
 
 function routeFromPath(pathname: string): Route {
+  if (pathname === "/" || pathname.endsWith("/index.html")) return "home";
+  if (pathname.endsWith("/friends-market-rules.html")) return "play";
   if (pathname.endsWith("/create-friends-market.html")) return "create";
   if (pathname.endsWith("/browse-friends-market.html")) return "browse";
   if (pathname.endsWith("/friends-market.html")) return "vault";
-  return "play";
+  return "home";
 }
 
 function initialLanguage(): Language {
@@ -42,6 +45,7 @@ function App() {
 
   useEffect(() => {
     const titles: Record<Route, string> = {
+      home: "OCP/Friends — Your private prediction party.",
       play: "OCP/Friends — How to Play",
       create: "Create Market — OCP/Friends",
       browse: "Browse Private Markets — OCP/Friends",
@@ -65,6 +69,7 @@ function App() {
       wallet={wallet}
       onNavigate={navigate}
     />
+    {route === "home" && <FriendsHome lang={lang} />}
     {route === "play" && <RulesPage lang={lang} />}
     {route === "create" && <CreatePrivateVault lang={lang} wallet={wallet} onNavigate={navigate} />}
     {route === "browse" && <BrowsePrivateVault lang={lang} wallet={wallet} onNavigate={navigate} />}
