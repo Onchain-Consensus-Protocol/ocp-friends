@@ -24,6 +24,7 @@ export const PRIVATE_VAULT_ABI = [
   "function resolveByCreator(uint8 outcome)", "function finalizeExpiredResolution()", "function withdraw()",
 ] as const;
 export const PRIVATE_VAULT_FACTORY_ABI = [
+  "function stakeToken() view returns (address)",
   "function createPrivateVault((string claim,string description,address stakeToken,uint8 resolutionMode,uint256 stakePeriod,uint256 resolutionPeriod,uint256 minStake,address[] allowedWallets) params) returns (address vault)",
   "function getPrivateVaultMeta(address vault) view returns (string claim, string description)",
   "function creatorPrivateVaultCount(address creator) view returns (uint256)",

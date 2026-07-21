@@ -58,6 +58,10 @@ export function CreatePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
       const token = new Contract(config.depositTokenAddress, ["function decimals() view returns (uint8)"], wallet.signer);
       const decimals = Number(await token.decimals());
       const factory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, wallet.signer);
+      const factoryStakeToken = String(await factory.stakeToken());
+      if (factoryStakeToken.toLowerCase() !== config.depositTokenAddress.toLowerCase()) {
+        throw new Error("Factory stake token does not match the configured USDC");
+      }
       const minStakeValue = parseUnits(minStake, decimals);
       if (minStakeValue <= 0n) throw new Error("Amount below min stake");
       const params = { claim: claim.trim(), description: encodeOutcomeMeanings(meanings), stakeToken: config.depositTokenAddress, resolutionMode: mode, stakePeriod, resolutionPeriod, minStake: minStakeValue, allowedWallets: wallets };

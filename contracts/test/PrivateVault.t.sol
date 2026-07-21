@@ -42,12 +42,72 @@ contract PrivateVaultTest is Test {
     uint256 private constant UNIT = 1e18;
 
     function setUp() public {
-        factory = new PrivateVaultFactory();
         token = new TestUSDC();
+        factory = new PrivateVaultFactory(address(token));
         token.mint(creator, 1_000 * UNIT);
         token.mint(alice, 1_000 * UNIT);
         token.mint(bob, 1_000 * UNIT);
         token.mint(outsider, 1_000 * UNIT);
+    }
+
+    function testFactoryBindsSingleStakeToken() public {
+        assertEq(factory.stakeToken(), address(token));
+        TestUSDC otherToken = new TestUSDC();
+        address[] memory invited = new address[](1);
+        invited[0] = alice;
+        PrivateVaultFactory.PrivateVaultParams memory params = PrivateVaultFactory.PrivateVaultParams({
+            claim: "Wrong token",
+            description: "Must revert",
+            stakeToken: address(otherToken),
+            resolutionMode: PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY,
+            stakePeriod: 1 days,
+            resolutionPeriod: 0,
+            minStake: UNIT,
+            allowedWallets: invited
+        });
+        vm.prank(creator);
+        vm.expectRevert("Unsupported stake token");
+        factory.createPrivateVault(params);
+    }
+
+    function testFactoryRejectsInvalidBoundToken() public {
+        vm.expectRevert("Invalid token");
+        new PrivateVaultFactory(address(0));
+        vm.expectRevert("Token has no code");
+        new PrivateVaultFactory(alice);
+    }
+
+    function testFuzzSettlementConservesAllPrincipal(
+        uint96 yesASeed,
+        uint96 yesBSeed,
+        uint96 noSeed
+    ) public {
+        uint256 yesA = bound(uint256(yesASeed), UNIT, 100 * UNIT);
+        uint256 yesB = bound(uint256(yesBSeed), UNIT, 100 * UNIT);
+        uint256 noAmount = bound(uint256(noSeed), UNIT, 100 * UNIT);
+        PrivateVault vault = _create(PrivateVault.ResolutionMode.AUTOMATIC_MAJORITY, 0);
+        _stake(creator, vault, PrivateVault.Side.YES, yesA);
+        _stake(alice, vault, PrivateVault.Side.YES, yesB);
+        _stake(bob, vault, PrivateVault.Side.NO, noAmount);
+
+        vm.warp(vault.stakeEndTime());
+        vault.finalizeByCoreRules();
+        assertEq(vault.totalPrincipal(), yesA + yesB + noAmount);
+        assertEq(vault.totalStakeYes() + vault.totalStakeNo(), vault.totalPrincipal());
+        assertEq(vault.settlementPool(), vault.totalPrincipal());
+
+        uint256 beforeTotal =
+            token.balanceOf(creator) + token.balanceOf(alice) + token.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw();
+        vm.prank(creator);
+        vault.withdraw();
+        vm.prank(alice);
+        vault.withdraw();
+        uint256 afterTotal =
+            token.balanceOf(creator) + token.balanceOf(alice) + token.balanceOf(bob);
+        assertEq(afterTotal - beforeTotal, yesA + yesB + noAmount);
+        assertEq(token.balanceOf(address(vault)), 0);
     }
 
     function testFactoryStoresMetadataAndWhitelist() public {
@@ -250,6 +310,7 @@ contract PrivateVaultTest is Test {
 
     function testRejectsFeeOnTransferStakeWithoutChangingAccounting() public {
         FeeOnTransferToken feeToken = new FeeOnTransferToken();
+        factory = new PrivateVaultFactory(address(feeToken));
         feeToken.mint(alice, 100 * UNIT);
         address[] memory invited = new address[](1);
         invited[0] = alice;

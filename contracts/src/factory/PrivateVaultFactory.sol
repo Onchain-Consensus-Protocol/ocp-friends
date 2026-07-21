@@ -9,6 +9,7 @@ import "../private/PrivateVault.sol";
 contract PrivateVaultFactory {
     uint256 public constant MAX_ALLOWED_WALLETS = 100;
     uint256 public constant MAX_PAGE_SIZE = 100;
+    address public immutable stakeToken;
 
     struct PrivateVaultParams {
         string claim;
@@ -38,12 +39,18 @@ contract PrivateVaultFactory {
         uint256 stakeEndTime
     );
 
+    constructor(address stakeToken_) {
+        require(stakeToken_ != address(0), "Invalid token");
+        require(stakeToken_.code.length > 0, "Token has no code");
+        stakeToken = stakeToken_;
+    }
+
     function createPrivateVault(PrivateVaultParams calldata params)
         external
         returns (address vault)
     {
-        require(params.stakeToken != address(0), "Invalid token");
-        require(params.stakeToken.code.length > 0, "Token has no code");
+        // Factory 在部署时绑定唯一结算代币；前端配置不能绕过此链上约束。
+        require(params.stakeToken == stakeToken, "Unsupported stake token");
         require(params.stakePeriod > 0, "Invalid stake period");
         require(params.minStake > 0, "Invalid min stake");
         require(params.allowedWallets.length <= MAX_ALLOWED_WALLETS, "Too many allowed wallets");

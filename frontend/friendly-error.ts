@@ -14,6 +14,7 @@ function collectErrorText(reason: unknown): string {
 export function friendlyError(reason: unknown, zh: boolean): string {
   const raw = collectErrorText(reason).toLowerCase();
   const match = (text: string) => raw.includes(text.toLowerCase());
+  if (match("unsupported stake token") || match("factory stake token does not match")) return zh ? "这个 Factory 只支持当前网络的官方 USDC。" : "This Factory supports only the official USDC on the current network.";
   if (match("position is locked to one side")) return zh
     ? "你已经选择了另一个选项。同一个 Market 中不能更换选项，只能继续增加原选项的金额。"
     : "You already selected another option in this Market. You cannot switch sides, but you can add to your original choice.";
@@ -29,7 +30,7 @@ export function friendlyError(reason: unknown, zh: boolean): string {
   if (match("already claimed")) return zh ? "你已经领取过资金。" : "You have already claimed your payout.";
   if (match("only creator")) return zh ? "只有创建者可以执行此操作。" : "Only the creator can perform this action.";
   if (match("resolution period expired")) return zh ? "创建者提交结果的时间已经结束。" : "The creator resolution period has ended.";
-  if (match("wrong network") || match("chain mismatch") || match("unsupported chain")) return zh ? "钱包网络不正确，请切换到 Base Sepolia。" : "Your wallet is on the wrong network. Switch to Base Sepolia.";
+  if (match("wrong network") || match("chain mismatch") || match("unsupported chain")) return zh ? "钱包网络不正确，请切换到当前网站配置的 Base 网络。" : "Your wallet is on the wrong network. Switch to the Base network configured by this site.";
   return zh
     ? "操作失败。请确认钱包网络、余额和当前 Market 状态后重试。"
     : "The action could not be completed. Check your wallet network, balance, and the current Market status, then try again.";
