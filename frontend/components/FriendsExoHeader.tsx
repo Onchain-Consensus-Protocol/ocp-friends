@@ -15,9 +15,9 @@ type WalletProps = {
 };
 
 const LINKS = [
-  { id: "play", href: "/private-vault-rules.html", zh: "玩法", en: "How to Play" },
-  { id: "create", href: "/create-private-vault.html", zh: "创建", en: "Create" },
-  { id: "browse", href: "/browse-private-vault.html", zh: "浏览", en: "Browse" },
+  { id: "play", href: "/friends-market-rules.html", zh: "玩法", en: "How to Play" },
+  { id: "create", href: "/create-friends-market.html", zh: "创建", en: "Create" },
+  { id: "browse", href: "/browse-friends-market.html", zh: "浏览", en: "Browse" },
 ] as const;
 
 export function FriendsHeader({ lang, onToggleLang, current, wallet, onNavigate }: {
@@ -35,7 +35,7 @@ export function FriendsHeader({ lang, onToggleLang, current, wallet, onNavigate 
   return <>
     <nav className="sticky top-0 z-50 border-b border-fuchsia-400/20 bg-[#090313]/90 shadow-[0_8px_30px_rgba(124,58,237,0.12)] backdrop-blur-xl">
       <div className="mx-auto grid min-h-16 w-full max-w-7xl grid-cols-[minmax(0,1fr)_2.25rem_auto] items-center gap-2 px-2 py-2 sm:px-6 md:flex md:gap-3 md:py-0 lg:px-8">
-        <a href="/private-vault-rules.html" onClick={(event) => navigate(event, "/private-vault-rules.html")} className="group flex min-w-0 items-center gap-1.5 overflow-hidden sm:gap-3 md:shrink-0" aria-label="OCP Friends">
+        <a href="/friends-market-rules.html" onClick={(event) => navigate(event, "/friends-market-rules.html")} className="group flex min-w-0 items-center gap-1.5 overflow-hidden sm:gap-3 md:shrink-0" aria-label="OCP Friends">
           <img src="/logo.png" alt="OCP" className="h-7 w-7 shrink-0 rounded-md object-contain transition-transform group-hover:rotate-6 group-hover:scale-110 sm:h-8 sm:w-8" />
           <span className="truncate whitespace-nowrap font-display text-[13px] font-bold tracking-wide text-text sm:text-xl">OCP<span className="friends-gradient-text">/</span><FriendsBrand gradient /></span>
         </a>

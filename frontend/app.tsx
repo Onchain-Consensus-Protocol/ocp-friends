@@ -12,9 +12,9 @@ import type { Language } from "./types";
 type Route = "play" | "create" | "browse" | "vault";
 
 function routeFromPath(pathname: string): Route {
-  if (pathname.endsWith("/create-private-vault.html")) return "create";
-  if (pathname.endsWith("/browse-private-vault.html")) return "browse";
-  if (pathname.endsWith("/private-vault.html")) return "vault";
+  if (pathname.endsWith("/create-friends-market.html")) return "create";
+  if (pathname.endsWith("/browse-friends-market.html")) return "browse";
+  if (pathname.endsWith("/friends-market.html")) return "vault";
   return "play";
 }
 

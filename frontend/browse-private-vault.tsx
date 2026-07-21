@@ -118,7 +118,7 @@ function VaultCard({ vault, zh, onNavigate }: { key?: React.Key; vault: MyVault;
     ended: "border-white/10 bg-white/5 text-text-muted",
   };
   const outcome = ["—", "YES", "NO", "INVALID"][vault.outcome] ?? "—";
-  const href = `/private-vault.html?vault=${vault.address}`;
+  const href = `/friends-market.html?vault=${vault.address}`;
   const shortAddress = `${vault.address.slice(0, 8)}…${vault.address.slice(-6)}`;
   return <a href={href} onClick={(event) => { event.preventDefault(); onNavigate(href); }} className="friends-card group block w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-fuchsia-400/20 bg-[#0d0618]/80 p-5 hover:border-fuchsia-400/50">
     <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${stageStyle[vault.stage]}`}>{stageLabel[vault.stage]}</span><ArrowRight className="h-4 w-4 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-fuchsia-300" /></div>

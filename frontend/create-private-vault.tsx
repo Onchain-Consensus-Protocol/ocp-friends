@@ -71,7 +71,7 @@ export function CreatePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         } catch { /* unrelated log */ }
       }
       if (!vault) throw new Error("Creation succeeded but the market address was not found in the receipt.");
-      onNavigate(`/private-vault.html?vault=${vault}`);
+      onNavigate(`/friends-market.html?vault=${vault}`);
     } catch (reason) {
       setError(friendlyError(reason, zh));
     } finally { setBusy(false); }
