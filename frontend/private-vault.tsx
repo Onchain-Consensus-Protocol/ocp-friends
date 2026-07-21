@@ -40,6 +40,14 @@ async function fetchInvitedWallets(provider: Provider, vaultAddress: string) {
   return [...wallets];
 }
 
+async function fetchInvitedWalletsFromApi(vaultAddress: string) {
+  const response = await fetch(`/api/invites?vault=${encodeURIComponent(vaultAddress)}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Invite API returned ${response.status}`);
+  const payload = await response.json() as { wallets?: unknown };
+  if (!Array.isArray(payload.wallets)) throw new Error("Invite API returned invalid data");
+  return payload.wallets.map((wallet) => getAddress(String(wallet)));
+}
+
 export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language; wallet: WalletController; onNavigate: (href: string) => void }) {
   const vaultAddress = new URLSearchParams(window.location.search).get("vault")?.trim() ?? "";
   const validVault = isAddress(vaultAddress);
@@ -74,16 +82,22 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   const refreshInvitedWallets = useCallback(async (provider?: Provider) => {
     setInviteListLoading(true);
     try {
-      const primaryProvider = provider ?? wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
-      setInvitedWallets(await fetchInvitedWallets(primaryProvider, vaultAddress));
+      // 历史事件由同源接口读取，避免手机钱包浏览器拦截或限流公共 RPC。
+      setInvitedWallets(await fetchInvitedWalletsFromApi(vaultAddress));
       setInviteListFailed(false);
     } catch {
       try {
-        setInvitedWallets(await fetchInvitedWallets(new JsonRpcProvider(config.eventRpcUrl), vaultAddress));
+        const primaryProvider = provider ?? wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
+        setInvitedWallets(await fetchInvitedWallets(primaryProvider, vaultAddress));
         setInviteListFailed(false);
       } catch {
-        // RPC 故障不代表链上名单为空；保留已显示的数据，避免刷新时名单凭空消失。
-        setInviteListFailed(true);
+        try {
+          setInvitedWallets(await fetchInvitedWallets(new JsonRpcProvider(config.eventRpcUrl), vaultAddress));
+          setInviteListFailed(false);
+        } catch {
+          // RPC 故障不代表链上名单为空；保留已显示的数据，避免刷新时名单凭空消失。
+          setInviteListFailed(true);
+        }
       }
     } finally {
       setInviteListLoading(false);
