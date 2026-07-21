@@ -1,11 +1,13 @@
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const configuredChainId = parseInt(env?.VITE_CHAIN_ID ?? "8453", 10);
 
 export const config = {
   privateVaultFactoryAddress: env?.VITE_PRIVATE_VAULT_FACTORY_ADDRESS ?? "0x0000000000000000000000000000000000000000",
   depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
+  chainId: configuredChainId,
   privateVaultStartBlock: parseInt(env?.VITE_PRIVATE_VAULT_START_BLOCK ?? "48926993", 10),
   rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
+  eventRpcUrl: env?.VITE_EVENT_RPC_URL ?? (configuredChainId === 8453 ? "https://mainnet.base.org" : (env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com")),
   explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
 };
 

@@ -22,18 +22,20 @@ const outcomeName = (value: number) => ["UNRESOLVED", "YES", "NO", "INVALID"][va
 const formatDate = (value: number, zh: boolean) => value ? new Date(value * 1000).toLocaleString(zh ? "zh-CN" : "en-US") : (zh ? "不适用" : "Not applicable");
 
 async function fetchInvitedWallets(provider: Provider, vaultAddress: string) {
-  const [allowedLogs, removedLogs] = await Promise.all([
-    provider.getLogs({ address: vaultAddress, topics: [id("WalletAllowed(address)")], fromBlock: config.privateVaultStartBlock, toBlock: "latest" }),
-    provider.getLogs({ address: vaultAddress, topics: [id("WalletRemoved(address)")], fromBlock: config.privateVaultStartBlock, toBlock: "latest" }),
-  ]);
-  const events = [
-    ...allowedLogs.map((log) => ({ log, allowed: true })),
-    ...removedLogs.map((log) => ({ log, allowed: false })),
-  ].sort((a, b) => a.log.blockNumber - b.log.blockNumber || a.log.index - b.log.index);
+  const allowedTopic = id("WalletAllowed(address)");
+  const removedTopic = id("WalletRemoved(address)");
+  const latestBlock = await provider.getBlockNumber();
+  const logs = [];
+  // Base 官方 RPC 将 eth_getLogs 限制为最多 10,000 个区块；分段读取也避免公共节点拒绝大范围历史查询。
+  for (let fromBlock = config.privateVaultStartBlock; fromBlock <= latestBlock; fromBlock += 5000) {
+    const toBlock = Math.min(fromBlock + 4999, latestBlock);
+    logs.push(...await provider.getLogs({ address: vaultAddress, topics: [[allowedTopic, removedTopic]], fromBlock, toBlock }));
+  }
+  const events = logs.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
   const wallets = new Set<string>();
-  for (const { log, allowed } of events) {
+  for (const log of events) {
     const wallet = getAddress(`0x${log.topics[1].slice(-40)}`);
-    if (allowed) wallets.add(wallet); else wallets.delete(wallet);
+    if (log.topics[0] === allowedTopic) wallets.add(wallet); else wallets.delete(wallet);
   }
   return [...wallets];
 }
@@ -48,6 +50,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   const [manageWallets, setManageWallets] = useState("");
   const [invitedWallets, setInvitedWallets] = useState<string[]>([]);
   const [inviteListLoading, setInviteListLoading] = useState(false);
+  const [inviteListFailed, setInviteListFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState<{ message: string; action: () => void } | null>(null);
@@ -73,11 +76,14 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
     try {
       const primaryProvider = provider ?? wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       setInvitedWallets(await fetchInvitedWallets(primaryProvider, vaultAddress));
+      setInviteListFailed(false);
     } catch {
       try {
-        setInvitedWallets(await fetchInvitedWallets(new JsonRpcProvider(config.rpcUrl), vaultAddress));
+        setInvitedWallets(await fetchInvitedWallets(new JsonRpcProvider(config.eventRpcUrl), vaultAddress));
+        setInviteListFailed(false);
       } catch {
-        setInvitedWallets([]);
+        // RPC 故障不代表链上名单为空；保留已显示的数据，避免刷新时名单凭空消失。
+        setInviteListFailed(true);
       }
     } finally {
       setInviteListLoading(false);
@@ -86,7 +92,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
 
   const load = useCallback(async () => {
     if (!validVault) { setState(null); setAccess("error"); return setError(zh ? "邀请链接中的 Market 地址无效。" : "The Market address in this invite link is invalid."); }
-    if (!wallet.address) { setState(null); setInvitedWallets([]); setError(""); setAccess("connect"); return; }
+    if (!wallet.address) { setState(null); setInvitedWallets([]); setInviteListFailed(false); setError(""); setAccess("connect"); return; }
     setAccess("checking");
     try {
       // 已连接时复用钱包节点，避免公共 RPC 限流导致交易成功后详情页打不开。
@@ -199,7 +205,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
         <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} zh={zh} />
         <div className="grid lg:grid-cols-3 gap-6">
           <section className="friends-card lg:col-span-2 border border-fuchsia-400/20 bg-[#120921]/90 rounded-2xl p-6"><h2 className="font-display font-bold mb-2">{zh ? "大家目前的选择" : "Current choices"}</h2><p className="mb-5 text-xs text-text-muted">{zh ? "玩家只能选择 YES 或 NO；INVALID 是退款结算状态。" : "Players can choose only YES or NO; INVALID is a refund outcome."}</p><ChoiceComparison yes={state.yes} no={state.no} /><div className="mt-5 grid sm:grid-cols-2 gap-3"><Pool side="YES" amount={fmt(state.yes)} color="text-success" /><Pool side="NO" amount={fmt(state.no)} color="text-danger" /></div><div className="mt-4 text-sm font-mono">{zh ? "总参与金额：" : "Total joined: "}<strong>{fmt(state.total)}</strong></div></section>
-          <div className="flex min-h-0 flex-col gap-4 lg:h-full"><section className="border border-border rounded-2xl p-5"><div className="flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "你的权限" : "Your Access"}</h2>{state.allowed && <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">{zh ? "已受邀" : "INVITED"}</span>}</div>{!wallet.connected ? <Button onClick={wallet.connectWallet} variant="outline" className="mt-3">{zh ? "连接钱包" : "Connect wallet"}</Button> : state.allowed ? <div className="mt-3 flex items-center gap-2 text-sm text-success"><ShieldCheck className="h-4 w-4" /><strong>{zh ? "可以参与这个 Market" : "You can join this Market"}</strong></div> : <div className="mt-3 text-danger text-sm"><strong>{zh ? "这是私人 Market。" : "This is a private Market."}</strong><p className="mt-1">{zh ? "当前钱包不在参与名单中。" : "Your wallet is not on the participant list."}</p></div>}<div className="mt-3 text-[11px] font-mono text-text-muted">{zh ? "仓位 " : "Position "}YES {fmt(state.userYes)} · NO {fmt(state.userNo)}</div></section><section className="min-h-0 flex-1 border border-border rounded-2xl p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "受邀地址" : "Invited Addresses"}</h2><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-mono text-text-muted">{inviteListLoading ? "…" : invitedWallets.length}</span></div>{!inviteListLoading && invitedWallets.length === 0 ? <p className="text-[11px] text-text-muted">{zh ? "暂时无法读取邀请名单。" : "The invite list is temporarily unavailable."}</p> : <div className="max-h-[5.75rem] space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">{invitedWallets.map((address) => <div key={address} title={address} className="flex items-center gap-2 rounded-lg bg-white/[0.035] px-2.5 py-1.5 font-mono text-[11px] leading-4 text-text-muted"><span className="min-w-0 flex-1 whitespace-nowrap">{short(address)}</span><span className="flex shrink-0 items-center gap-1">{address.toLowerCase() === state.creator.toLowerCase() && <span className="rounded-full bg-fuchsia-400/10 px-1.5 py-0.5 text-[9px] text-fuchsia-300">{zh ? "创建者" : "Creator"}</span>}{address.toLowerCase() === wallet.address?.toLowerCase() && <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] text-success">{zh ? "你" : "You"}</span>}</span></div>)}</div>}</section></div>
+          <div className="flex min-h-0 flex-col gap-4 lg:h-full"><section className="border border-border rounded-2xl p-5"><div className="flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "你的权限" : "Your Access"}</h2>{state.allowed && <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">{zh ? "已受邀" : "INVITED"}</span>}</div>{!wallet.connected ? <Button onClick={wallet.connectWallet} variant="outline" className="mt-3">{zh ? "连接钱包" : "Connect wallet"}</Button> : state.allowed ? <div className="mt-3 flex items-center gap-2 text-sm text-success"><ShieldCheck className="h-4 w-4" /><strong>{zh ? "可以参与这个 Market" : "You can join this Market"}</strong></div> : <div className="mt-3 text-danger text-sm"><strong>{zh ? "这是私人 Market。" : "This is a private Market."}</strong><p className="mt-1">{zh ? "当前钱包不在参与名单中。" : "Your wallet is not on the participant list."}</p></div>}<div className="mt-3 text-[11px] font-mono text-text-muted">{zh ? "仓位 " : "Position "}YES {fmt(state.userYes)} · NO {fmt(state.userNo)}</div></section><section className="min-h-0 flex-1 border border-border rounded-2xl p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "受邀地址" : "Invited Addresses"}</h2><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-mono text-text-muted">{inviteListLoading ? "…" : invitedWallets.length}</span></div>{!inviteListLoading && invitedWallets.length === 0 ? <p className={`text-[11px] ${inviteListFailed ? "text-danger" : "text-text-muted"}`}>{inviteListFailed ? (zh ? "邀请名单读取失败，请稍后重试。" : "Failed to load the invite list. Please try again.") : (zh ? "暂无受邀地址。" : "No invited addresses.")}</p> : <div className="max-h-[5.75rem] space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">{invitedWallets.map((address) => <div key={address} title={address} className="flex items-center gap-2 rounded-lg bg-white/[0.035] px-2.5 py-1.5 font-mono text-[11px] leading-4 text-text-muted"><span className="min-w-0 flex-1 whitespace-nowrap">{short(address)}</span><span className="flex shrink-0 items-center gap-1">{address.toLowerCase() === state.creator.toLowerCase() && <span className="rounded-full bg-fuchsia-400/10 px-1.5 py-0.5 text-[9px] text-fuchsia-300">{zh ? "创建者" : "Creator"}</span>}{address.toLowerCase() === wallet.address?.toLowerCase() && <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] text-success">{zh ? "你" : "You"}</span>}</span></div>)}</div>}</section></div>
         </div>
         <section className="border border-border rounded-2xl p-6 mt-6"><h2 className="font-display font-bold text-xl">{zh ? "Market 操作" : "Market Actions"}</h2>
           {state.mode === 1 && staking && <div className="my-4 p-3 border border-[#ff5a6f]/60 bg-[#ff5a6f]/10 rounded-xl text-sm font-bold text-pink-100">{zh ? "创建者可能持有这个 Market 的仓位，并将决定最终结果。" : "The creator may have a financial position in this Market and will determine the final outcome."}</div>}
