@@ -4,6 +4,7 @@ export const config = {
   privateVaultFactoryAddress: env?.VITE_PRIVATE_VAULT_FACTORY_ADDRESS ?? "0x0000000000000000000000000000000000000000",
   depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
+  privateVaultStartBlock: parseInt(env?.VITE_PRIVATE_VAULT_START_BLOCK ?? "48926993", 10),
   rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
   explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
 };
@@ -22,6 +23,7 @@ export const PRIVATE_VAULT_ABI = [
   "function stake(uint8 side, uint256 amount)", "function addAllowedWallets(address[] wallets)",
   "function removeAllowedWallet(address wallet)", "function finalizeByCoreRules()",
   "function resolveByCreator(uint8 outcome)", "function finalizeExpiredResolution()", "function withdraw()",
+  "event WalletAllowed(address indexed wallet)", "event WalletRemoved(address indexed wallet)",
 ] as const;
 export const PRIVATE_VAULT_FACTORY_ABI = [
   "function stakeToken() view returns (address)",
