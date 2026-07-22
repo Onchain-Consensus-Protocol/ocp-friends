@@ -11,7 +11,7 @@ In Creator Resolved mode, the contract rejects YES or NO when nobody holds that 
 ## Repository
 
 - `contracts/`: standalone `PrivateVault` and `PrivateVaultFactory`, Foundry tests, and deployment script.
-- `frontend/`: bilingual OCP/Friends web app for rules, creation, browsing wallet-accessible Vaults, and Vault participation.
+- `frontend/`: bilingual OCP/Friends web app for rules, creation, browsing wallet-accessible Vaults, participation, and post-settlement position, payout, profit, and ROI summaries.
 
 ## Local development
 
