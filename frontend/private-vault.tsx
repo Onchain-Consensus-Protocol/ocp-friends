@@ -48,6 +48,10 @@ async function fetchInvitedWalletsFromApi(vaultAddress: string) {
   return payload.wallets.map((wallet) => getAddress(String(wallet)));
 }
 
+const waitForFreshMarketState = (milliseconds: number) => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, milliseconds);
+});
+
 export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language; wallet: WalletController; onNavigate: (href: string) => void }) {
   const vaultAddress = new URLSearchParams(window.location.search).get("vault")?.trim() ?? "";
   const validVault = isAddress(vaultAddress);
@@ -119,12 +123,20 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
       const configuredFactory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
-      // 创建完成后的首次读取固定到交易回执区块，避免钱包 RPC 的 latest 缓存短暂返回创建前状态。
-      const createdBlock = createdBlockRef.current;
-      const readOptions = createdBlock === undefined ? {} : { blockTag: createdBlock };
-      if (!await configuredFactory.isPrivateVault(vaultAddress, readOptions)) { setState(null); setAccess("denied"); return; }
-      if (!await vault.allowedWallets(wallet.address, readOptions)) { setState(null); setAccess("denied"); return; }
-      setState(await fetchMarketState(provider, wallet.address, createdBlock));
+      // 钱包节点对历史 blockTag 的支持并不一致。详情页始终读取 latest；仅在刚创建后
+      // 给节点几秒同步时间，避免短暂缓存把创建者误判成未受邀。
+      const createdFromThisSession = createdBlockRef.current !== undefined;
+      const attempts = createdFromThisSession ? 6 : 1;
+      let isVault = false;
+      let isAllowed = false;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        isVault = await configuredFactory.isPrivateVault(vaultAddress);
+        isAllowed = isVault && await vault.allowedWallets(wallet.address);
+        if (isVault && isAllowed) break;
+        if (attempt + 1 < attempts) await waitForFreshMarketState(750);
+      }
+      if (!isVault || !isAllowed) { setState(null); setAccess("denied"); return; }
+      setState(await fetchMarketState(provider, wallet.address));
       setAccess("allowed");
       createdBlockRef.current = undefined;
       if (createdBlockKey) window.sessionStorage.removeItem(createdBlockKey);
