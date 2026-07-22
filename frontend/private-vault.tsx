@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Contract, JsonRpcProvider, formatUnits, getAddress, id, isAddress, parseUnits, type ContractRunner, type Provider } from "ethers";
 import { AlertTriangle, Copy, KeyRound, PartyPopper, ShieldCheck, Sparkles } from "lucide-react";
 import { FriendsBrand } from "./components/FriendsBrand";
@@ -51,6 +51,12 @@ async function fetchInvitedWalletsFromApi(vaultAddress: string) {
 export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language; wallet: WalletController; onNavigate: (href: string) => void }) {
   const vaultAddress = new URLSearchParams(window.location.search).get("vault")?.trim() ?? "";
   const validVault = isAddress(vaultAddress);
+  const createdBlockKey = validVault ? `friends-market-created-block:${vaultAddress.toLowerCase()}` : "";
+  const createdBlockRef = useRef<number | undefined>((() => {
+    if (!createdBlockKey) return undefined;
+    const value = Number(window.sessionStorage.getItem(createdBlockKey));
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  })());
   const [state, setState] = useState<State | null>(null);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const [amount, setAmount] = useState("");
@@ -106,21 +112,25 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
 
   const load = useCallback(async () => {
     if (!validVault) { setState(null); setAccess("error"); return setError(zh ? "邀请链接中的 Market 地址无效。" : "The Market address in this invite link is invalid."); }
-    if (!wallet.address) { setState(null); setInvitedWallets([]); setInviteListFailed(false); setError(""); setAccess("connect"); return; }
+    if (!wallet.address) { setState(null); setInvitedWallets([]); setInviteListFailed(false); setAccess("connect"); return; }
     setAccess("checking");
     try {
       // 已连接时复用钱包节点，避免公共 RPC 限流导致交易成功后详情页打不开。
       const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
       const configuredFactory = new Contract(config.privateVaultFactoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
-      if (!await configuredFactory.isPrivateVault(vaultAddress)) { setState(null); setError(""); setAccess("denied"); return; }
-      if (!await vault.allowedWallets(wallet.address)) { setState(null); setError(""); setAccess("denied"); return; }
-      setState(await fetchMarketState(provider, wallet.address));
+      // 创建完成后的首次读取固定到交易回执区块，避免钱包 RPC 的 latest 缓存短暂返回创建前状态。
+      const createdBlock = createdBlockRef.current;
+      const readOptions = createdBlock === undefined ? {} : { blockTag: createdBlock };
+      if (!await configuredFactory.isPrivateVault(vaultAddress, readOptions)) { setState(null); setAccess("denied"); return; }
+      if (!await vault.allowedWallets(wallet.address, readOptions)) { setState(null); setAccess("denied"); return; }
+      setState(await fetchMarketState(provider, wallet.address, createdBlock));
       setAccess("allowed");
-      setError("");
+      createdBlockRef.current = undefined;
+      if (createdBlockKey) window.sessionStorage.removeItem(createdBlockKey);
       void refreshInvitedWallets(provider);
     } catch (reason) { setState(null); setAccess("error"); setError(friendlyError(reason, zh)); }
-  }, [validVault, vaultAddress, wallet.address, wallet.signer, zh, fetchMarketState, refreshInvitedWallets]);
+  }, [validVault, vaultAddress, createdBlockKey, wallet.address, wallet.signer, zh, fetchMarketState, refreshInvitedWallets]);
   useEffect(() => { load(); }, [load]);
 
   const refreshMarketState = useCallback(async (blockTag?: number, refreshInvites = false, silent = false) => {
@@ -129,7 +139,6 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const provider = wallet.signer?.provider ?? new JsonRpcProvider(config.rpcUrl);
       setState(await fetchMarketState(provider, wallet.address, blockTag));
       if (refreshInvites) void refreshInvitedWallets(provider);
-      setError("");
     } catch (reason) {
       // 交易已经上链时，刷新失败也保留当前页面，只弹出错误供用户重试。
       if (!silent) setError(friendlyError(reason, zh));
@@ -148,7 +157,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   const transact = async (action: (vault: Contract) => Promise<unknown>) => {
     if (!wallet.signer) return wallet.connectWallet();
     setBusy(true); setError("");
-    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<{ blockNumber?: number } | null> }; const receipt = await tx.wait(); await refreshMarketState(receipt?.blockNumber, true); }
+    try { const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer); const tx = await action(vault) as { wait: () => Promise<{ blockNumber?: number } | null> }; const receipt = await tx.wait(); await refreshMarketState(receipt?.blockNumber, true, true); }
     catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };
@@ -175,8 +184,18 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, wallet.signer);
       const receipt = await (await vault.stake(side, value)).wait();
       setAmount("");
-      // 按质押交易所在区块读取，避免钱包 RPC 的 latest 缓存返回交易前数据。
-      await refreshMarketState(receipt?.blockNumber);
+      // 交易回执已经确认成功：先乐观更新，后续读取失败不能再误报为“质押未完成”。
+      setState((current) => current ? {
+        ...current,
+        participated: true,
+        total: current.total + value,
+        yes: current.yes + (side === 0 ? value : 0n),
+        no: current.no + (side === 1 ? value : 0n),
+        userYes: current.userYes + (side === 0 ? value : 0n),
+        userNo: current.userNo + (side === 1 ? value : 0n),
+      } : current);
+      // 按质押区块静默校准链上状态；失败时保留已确认的乐观状态，定时刷新会继续重试。
+      void refreshMarketState(receipt?.blockNumber, false, true);
     } catch (reason) { setError(friendlyError(reason, zh)); }
     finally { setBusy(false); }
   };

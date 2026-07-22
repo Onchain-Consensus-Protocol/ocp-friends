@@ -75,6 +75,9 @@ export function CreatePrivateVault({ lang, wallet, onNavigate }: { lang: Languag
         } catch { /* unrelated log */ }
       }
       if (!vault) throw new Error("Creation succeeded but the market address was not found in the receipt.");
+      if (receipt.blockNumber !== undefined) {
+        window.sessionStorage.setItem(`friends-market-created-block:${vault.toLowerCase()}`, String(receipt.blockNumber));
+      }
       onNavigate(`/friends-market.html?vault=${vault}`);
     } catch (reason) {
       setError(friendlyError(reason, zh));
