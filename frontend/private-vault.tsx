@@ -16,7 +16,7 @@ type State = {
   creator: string; mode: number; stakeEnd: number; resolutionDeadline: number; minStake: bigint;
   token: string; symbol: string; decimals: number; finalized: boolean; outcome: number;
   allowed: boolean; participated: boolean; claimed: boolean; total: bigint; yes: bigint; no: bigint; invalid: bigint;
-  userYes: bigint; userNo: bigint; userInvalid: bigint; claim: string; description: string;
+  userYes: bigint; userNo: bigint; userInvalid: bigint; settlementPool: bigint; claim: string; description: string;
 };
 const outcomeName = (value: number) => ["UNRESOLVED", "YES", "NO", "INVALID"][value] ?? "UNKNOWN";
 const formatDate = (value: number, zh: boolean) => value ? new Date(value * 1000).toLocaleString(zh ? "zh-CN" : "en-US") : (zh ? "不适用" : "Not applicable");
@@ -80,13 +80,13 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
   const fetchMarketState = useCallback(async (provider: ContractRunner, user: string, blockTag?: number): Promise<State> => {
     const vault = new Contract(vaultAddress, PRIVATE_VAULT_ABI, provider);
     const readOptions = blockTag === undefined ? {} : { blockTag };
-    const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, factoryAddress] = await Promise.all([
-      vault.creator(readOptions), vault.resolutionMode(readOptions), vault.stakeEndTime(readOptions), vault.resolutionDeadline(readOptions), vault.minStake(readOptions), vault.stakeToken(readOptions), vault.finalized(readOptions), vault.resolvedOutcome(readOptions), vault.hasParticipated(user, readOptions), vault.hasClaimed(user, readOptions), vault.totalPrincipal(readOptions), vault.totalStakeYes(readOptions), vault.totalStakeNo(readOptions), vault.totalStakeInvalid(readOptions), vault.stakeOf(user, readOptions), vault.factory(readOptions),
+    const [creator, mode, stakeEnd, deadline, minStake, tokenAddress, finalized, outcome, participated, claimed, total, yes, no, invalid, stake, settlementPool, factoryAddress] = await Promise.all([
+      vault.creator(readOptions), vault.resolutionMode(readOptions), vault.stakeEndTime(readOptions), vault.resolutionDeadline(readOptions), vault.minStake(readOptions), vault.stakeToken(readOptions), vault.finalized(readOptions), vault.resolvedOutcome(readOptions), vault.hasParticipated(user, readOptions), vault.hasClaimed(user, readOptions), vault.totalPrincipal(readOptions), vault.totalStakeYes(readOptions), vault.totalStakeNo(readOptions), vault.totalStakeInvalid(readOptions), vault.stakeOf(user, readOptions), vault.settlementPool(readOptions), vault.factory(readOptions),
     ]);
     const token = new Contract(tokenAddress, ERC20_ABI, provider);
     const factory = new Contract(factoryAddress, PRIVATE_VAULT_FACTORY_ABI, provider);
     const [decimals, symbol, meta] = await Promise.all([token.decimals(readOptions), token.symbol(readOptions), factory.getPrivateVaultMeta(vaultAddress, readOptions)]);
-    return { creator, mode: Number(mode), stakeEnd: Number(stakeEnd), resolutionDeadline: Number(deadline), minStake, token: tokenAddress, symbol, decimals: Number(decimals), finalized, outcome: Number(outcome), allowed: true, participated, claimed, total, yes, no, invalid, userYes: stake[0], userNo: stake[1], userInvalid: stake[2], claim: meta[0], description: meta[1] };
+    return { creator, mode: Number(mode), stakeEnd: Number(stakeEnd), resolutionDeadline: Number(deadline), minStake, token: tokenAddress, symbol, decimals: Number(decimals), finalized, outcome: Number(outcome), allowed: true, participated, claimed, total, yes, no, invalid, userYes: stake[0], userNo: stake[1], userInvalid: stake[2], settlementPool, claim: meta[0], description: meta[1] };
   }, [vaultAddress]);
 
   const refreshInvitedWallets = useCallback(async (provider?: Provider) => {
@@ -250,7 +250,7 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
         <ResolutionMethod mode={state.mode} stakeEnd={state.stakeEnd} resolutionDeadline={state.resolutionDeadline} zh={zh} />
         <div className="grid lg:grid-cols-3 gap-6">
           <section className="friends-card lg:col-span-2 border border-fuchsia-400/20 bg-[#120921]/90 rounded-2xl p-6"><h2 className="font-display font-bold mb-2">{zh ? "大家目前的选择" : "Current choices"}</h2><p className="mb-5 text-xs text-text-muted">{zh ? "玩家只能选择 YES 或 NO；INVALID 是退款结算状态。" : "Players can choose only YES or NO; INVALID is a refund outcome."}</p><ChoiceComparison yes={state.yes} no={state.no} /><div className="mt-5 grid sm:grid-cols-2 gap-3"><Pool side="YES" amount={fmt(state.yes)} color="text-success" /><Pool side="NO" amount={fmt(state.no)} color="text-danger" /></div><div className="mt-4 text-sm font-mono">{zh ? "总参与金额：" : "Total joined: "}<strong>{fmt(state.total)}</strong></div></section>
-          <div className="flex min-h-0 flex-col gap-4 lg:h-full"><section className="border border-border rounded-2xl p-5"><div className="flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "你的权限" : "Your Access"}</h2>{state.allowed && <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">{zh ? "已受邀" : "INVITED"}</span>}</div>{!wallet.connected ? <Button onClick={wallet.connectWallet} variant="outline" className="mt-3">{zh ? "连接钱包" : "Connect wallet"}</Button> : state.allowed ? <div className="mt-3 flex items-center gap-2 text-sm text-success"><ShieldCheck className="h-4 w-4" /><strong>{zh ? "可以参与这个 Market" : "You can join this Market"}</strong></div> : <div className="mt-3 text-danger text-sm"><strong>{zh ? "这是私人 Market。" : "This is a private Market."}</strong><p className="mt-1">{zh ? "当前钱包不在参与名单中。" : "Your wallet is not on the participant list."}</p></div>}<div className="mt-3 text-[11px] font-mono text-text-muted">{zh ? "仓位 " : "Position "}YES {fmt(state.userYes)} · NO {fmt(state.userNo)}</div></section><section className="min-h-0 flex-1 border border-border rounded-2xl p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "受邀地址" : "Invited Addresses"}</h2><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-mono text-text-muted">{inviteListLoading ? "…" : invitedWallets.length}</span></div>{!inviteListLoading && invitedWallets.length === 0 ? <p className={`text-[11px] ${inviteListFailed ? "text-danger" : "text-text-muted"}`}>{inviteListFailed ? (zh ? "邀请名单读取失败，请稍后重试。" : "Failed to load the invite list. Please try again.") : (zh ? "暂无受邀地址。" : "No invited addresses.")}</p> : <div className="max-h-[5.75rem] space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">{invitedWallets.map((address) => <div key={address} title={address} className="flex items-center gap-2 rounded-lg bg-white/[0.035] px-2.5 py-1.5 font-mono text-[11px] leading-4 text-text-muted"><span className="min-w-0 flex-1 whitespace-nowrap">{short(address)}</span><span className="flex shrink-0 items-center gap-1">{address.toLowerCase() === state.creator.toLowerCase() && <span className="rounded-full bg-fuchsia-400/10 px-1.5 py-0.5 text-[9px] text-fuchsia-300">{zh ? "创建者" : "Creator"}</span>}{address.toLowerCase() === wallet.address?.toLowerCase() && <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] text-success">{zh ? "你" : "You"}</span>}</span></div>)}</div>}</section></div>
+          <div className="flex min-h-0 flex-col gap-4 lg:h-full"><PositionSummary state={state} zh={zh} connected={wallet.connected} onConnect={wallet.connectWallet} /><section className="min-h-0 flex-1 border border-border rounded-2xl p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-display font-bold">{zh ? "受邀地址" : "Invited Addresses"}</h2><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-mono text-text-muted">{inviteListLoading ? "…" : invitedWallets.length}</span></div>{!inviteListLoading && invitedWallets.length === 0 ? <p className={`text-[11px] ${inviteListFailed ? "text-danger" : "text-text-muted"}`}>{inviteListFailed ? (zh ? "邀请名单读取失败，请稍后重试。" : "Failed to load the invite list. Please try again.") : (zh ? "暂无受邀地址。" : "No invited addresses.")}</p> : <div className="max-h-[5.75rem] space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">{invitedWallets.map((address) => <div key={address} title={address} className="flex items-center gap-2 rounded-lg bg-white/[0.035] px-2.5 py-1.5 font-mono text-[11px] leading-4 text-text-muted"><span className="min-w-0 flex-1 whitespace-nowrap">{short(address)}</span><span className="flex shrink-0 items-center gap-1">{address.toLowerCase() === state.creator.toLowerCase() && <span className="rounded-full bg-fuchsia-400/10 px-1.5 py-0.5 text-[9px] text-fuchsia-300">{zh ? "创建者" : "Creator"}</span>}{address.toLowerCase() === wallet.address?.toLowerCase() && <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] text-success">{zh ? "你" : "You"}</span>}</span></div>)}</div>}</section></div>
         </div>
         <section className="border border-border rounded-2xl p-6 mt-6"><h2 className="font-display font-bold text-xl">{zh ? "Market 操作" : "Market Actions"}</h2>
           {state.mode === 1 && staking && <div className="my-4 p-3 border border-[#ff5a6f]/60 bg-[#ff5a6f]/10 rounded-xl text-sm font-bold text-pink-100">{zh ? "创建者可能持有这个 Market 的仓位，并将决定最终结果。" : "The creator may have a financial position in this Market and will determine the final outcome."}</div>}
@@ -264,6 +264,60 @@ export function PrivateVaultPage({ lang, wallet, onNavigate }: { lang: Language;
       </>}
       </>}
   </main>;
+}
+
+function PositionSummary({ state, zh, connected, onConnect }: { state: State; zh: boolean; connected: boolean; onConnect: () => void }) {
+  const principal = state.userYes + state.userNo;
+  const position = state.userYes > 0n ? "YES" : state.userNo > 0n ? "NO" : null;
+  const won = state.finalized && ((state.outcome === 1 && state.userYes > 0n) || (state.outcome === 2 && state.userNo > 0n));
+  const refunded = state.finalized && state.outcome === 3 && principal > 0n;
+  const lost = state.finalized && state.participated && !won && !refunded;
+  const payoutDenominator = state.outcome === 1 ? state.yes : state.outcome === 2 ? state.no : state.total;
+  const payout = (won || refunded) && payoutDenominator > 0n ? state.settlementPool * principal / payoutDenominator : 0n;
+  const profit = payout > principal ? payout - principal : 0n;
+  const roiHundredths = profit > 0n && principal > 0n ? profit * 10_000n / principal : 0n;
+  const amount = (value: bigint) => `${formatUnits(value, state.decimals)} ${state.symbol}`;
+  const roi = `+${roiHundredths / 100n}.${(roiHundredths % 100n).toString().padStart(2, "0")}%`;
+  const badge = won
+    ? { label: zh ? "获胜" : "WON", className: "border-success/30 bg-success/10 text-success" }
+    : refunded
+      ? { label: zh ? "已退款" : "REFUNDED", className: "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-200" }
+      : lost
+        ? { label: zh ? "未获胜" : "LOST", className: "border-danger/30 bg-danger/10 text-danger" }
+        : state.participated
+          ? { label: zh ? "持仓中" : "OPEN POSITION", className: "border-amber-300/30 bg-amber-300/10 text-amber-200" }
+          : { label: zh ? "已受邀" : "INVITED", className: "border-success/30 bg-success/10 text-success" };
+
+  return <section className="friends-card overflow-hidden rounded-2xl border border-fuchsia-400/30 bg-[#120921]/95 p-5 shadow-[0_0_28px_rgba(217,70,239,0.08)]">
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="font-display text-lg font-bold">{state.participated ? (zh ? "你的仓位" : "Your Position") : (zh ? "你的权限" : "Your Access")}</h2>
+      <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wide ${badge.className}`}>{badge.label}</span>
+    </div>
+    {!connected ? <Button onClick={onConnect} variant="primary" className="mt-4">{zh ? "连接钱包" : "Connect wallet"}</Button> : !state.participated ? <div className="mt-5">
+      <div className="flex items-center gap-3 font-display text-lg font-bold text-success"><ShieldCheck className="h-6 w-6 shrink-0" />{zh ? "你可以参与这个 Market" : "You can join this Market"}</div>
+      <p className="mt-3 text-xs text-text-muted">{zh ? "你还没有持仓。" : "You do not have a position yet."}</p>
+    </div> : <div className="mt-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <div className={`font-display text-4xl font-black leading-none ${position === "YES" ? "text-success" : "text-danger"}`}>{position ?? "—"}</div>
+          <div className="mt-2 text-[11px] font-bold uppercase tracking-widest text-text-muted">{zh ? "选择" : "Position"}</div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-lg font-bold text-text">{amount(principal)}</div>
+          <div className="mt-1 text-[11px] font-bold uppercase tracking-widest text-text-muted">{zh ? "投入本金" : "Staked"}</div>
+        </div>
+      </div>
+      {state.finalized && <div className="mt-5 border-t border-white/10 pt-4">
+        {(won || refunded) ? <div className="flex items-center justify-between gap-3 text-sm"><span className="text-text-muted">{zh ? "结算金额" : "Payout"}</span><strong className="font-mono">{amount(payout)}</strong></div> : <div className="flex items-center justify-between gap-3 text-sm"><span className="text-text-muted">{zh ? "结算金额" : "Payout"}</span><strong className="font-mono text-danger">0 {state.symbol}</strong></div>}
+        {profit > 0n && <div className="mt-3 rounded-xl border border-success/30 bg-success/10 p-3">
+          <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold uppercase tracking-wide text-success">{zh ? "盈利" : "Profit"}</span><strong className="font-mono text-success">+{amount(profit)}</strong></div>
+          <div className="mt-2 font-display text-3xl font-black text-success">{roi} <span className="text-xs font-bold uppercase tracking-wider">ROI</span></div>
+        </div>}
+        {refunded && <p className="mt-3 text-xs text-fuchsia-200">{zh ? "本金已按 INVALID 结果退回。" : "Principal returned under the INVALID outcome."}</p>}
+        {(won || refunded) && <p className="mt-3 text-[11px] text-text-muted">{state.claimed ? (zh ? "结算资金已领取" : "Payout claimed") : (zh ? "结算资金可领取" : "Payout ready to claim")}</p>}
+      </div>}
+    </div>}
+  </section>;
 }
 
 function AccessGate({ access, error, zh, onConnect, onNavigate }: { access: "connect" | "checking" | "denied" | "allowed" | "error"; error: string; zh: boolean; onConnect: () => void; onNavigate: (href: string) => void }) {
